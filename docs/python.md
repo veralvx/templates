@@ -182,7 +182,7 @@ LICENSE-MIT / LICENSE-APACHE (a workspace member carries its own copies)
 
 ### The tools, pinned to nixpkgs
 
-The dev group's tools are exact pins (`ruff==0.16.10`, `basedpyright==1.39.8`, `pytest==9.1.1`
+The dev group's tools are exact pins (`ruff`, `basedpyright`, `pytest`
 ...), each the version the flake's nixpkgs carries, and `required-version` pins uv itself. So
 `uv run` (and CI) and `nix flake check` judge the code with the same tools: with floors, the lock
 took newer releases, and a new ruff rule or stub disagreed with Nix's verdict on the same code
