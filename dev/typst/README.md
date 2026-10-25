@@ -136,12 +136,11 @@ branch and from a tag; what changed since is this repository's history. Also run
   each project the same as with it.
 - **CI's installer**, a generated project's `.github/install-tools.sh`, with `nix` and `docker`
   stood in for: it builds the flake's `tools` from the lock as committed (`--no-update-lock-file`),
-  pulls the image of the lock's package-check tag (`0.7.0`), and puts their `bin/` and the command
+  pulls the image of the lock's package-check tag, and puts their `bin/` and the command
   running that image on `GITHUB_PATH`; a lock whose input has no tag, or one that is no version, is
   refused before anything is built. `tools` evaluates, with the real Nix, to the nine tools at the
   lock's versions; building it, from nixpkgs' binary cache, and the pull are CI's.
-- **The root's recipes**: `just smoke typst package` and `just smoke typst template` pass (typst
-  0.15.1, tytanic 0.4.1, typstyle 0.15.1, tinymist 0.15.8, typst-package-check 0.7.0), in the
+- **The root's recipes**: `just smoke typst package` and `just smoke typst template` pass (typst, tytani, typstyle, tinymist, typst-package-check), in the
   generated flake's dev shell as a stand-in `nix` has it: its own packages at their versions, and
   nothing else (but git, awk, Python's patch release and stdenv's other tools, this machine's);
   every kind `just generate typst` makes equals what smoke-typst.yml's generate and Nix jobs make.
@@ -151,24 +150,22 @@ branch and from a tag; what changed since is this repository's history. Also run
   flake check` left to CI).
 - **[New Typst releases, and the floor](../../docs/typst.md#new-typst-releases-and-the-floor)**,
   as written: render-check's `compiler` cap failing a regex short of the flake's Typst ("refuses
-  the flake's Typst, 0.15.1") and one past it ("accepts 0.15.2"); the floor as `typst.toml`'s
+  the flake's Typst") and one past it ("accepts 0.15.2"); the floor as `typst.toml`'s
   `compiler` alone, which CI's second job and `just floor` read; the references' paths. Not run: a
   Typst newer than the lock's, and so a reference re-rendered.
 
 ### In typst-template, before the move
 
-The template was driven end to end with the real tools, not reasoned about. With **cargo-generate
-0.25.0**, **typst 0.15.1**, **tytanic 0.4.1**, **typstyle 0.15.1**, **tinymist 0.15.8**,
-**typst-package-check 0.7.0** (built from its tag), **just 1.58.0**, **shellcheck 0.11.0**, **shfmt
-3.14.1**, **actionlint 1.7.12**, **cocogitto 7.0.0**, **git-cliff 2.14.2** and **dprint 0.61.1**
-(markdown 0.26.0, TOML 0.9.0), all 16 kind × licence × email combinations generate and, after their
+The template was driven end to end with the real tools, not reasoned about. With **cargo-generate**, **typst**, **tytanic**, **typstyle**, **tinymist**,
+**typst-package-check** (built from its tag), **just**, **shellcheck**, **shfmt**, **actionlint**, **cocogitto**, **git-cliff** and **dprint**
+(markdown, TOML), all 16 kind × licence × email combinations generate and, after their
 first commit, pass `just --fmt --check` and `just checks` but for `nix`: `tools-check`,
 `format-check`, `lint`, `shell-check`, `actionlint`, `test`, `versions-check`, `readme-check`,
 `template-check`, `package-check`, `dprint-check` and `cog`.
 
 Also confirmed by running it:
 
-- **The floor**: the README and the template compile on Typst 0.12.0 and 0.14.0 (`just floor`,
+- **The floor**: the README and the template compile on Typst (`just floor`,
   with `compiler` set to each).
 - **The bundle**: exactly the package's files (typst.toml, src/, template/, README.md, the
   licences, after a release the changelog); a template's thumbnail 2067 × 2923 px, about 650 KB, of
