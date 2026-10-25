@@ -1,0 +1,66 @@
+# GitHub Actions, pinned to commits, each release in a comment, and Dependabot moves both
+# (docs.github.com, "Dependabot supported ecosystems"); and the flake's inputs, monthly. Not moved
+# here:
+#   - typst-package-check, its flake input's tag (CI runs the image of that tag):
+#     typst/packages' own version (its .github/workflows/lint.yml), moved by hand when it moves --
+#     the tag in flake.nix, then `nix flake update package-check`
+#   - the dprint plugins in dprint.json: `just dprint-update`
+#   - a `@preview` package the code imports: by hand, its version in the import
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    # `ci(deps): ...` -- nothing a user of the package meets, so no changelog entry
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels: # each created once (Issues > Labels): one the repository lacks is ignored
+      - "dependencies"
+      - "actions"
+    groups:
+      # minor and patch updates in one pull request (dependabot-automerge.yml merges it once the
+      # checks pass); a major one alone, for review
+      actions-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    cooldown:
+      default-days: 3
+
+  # the flake's inputs, monthly, in one pull request (Dependabot's `nix` ecosystem: nixpkgs to its
+  # branch's newest commit): every tool with them, the dev shell's and CI's, so its checks are the
+  # new tools' verdict -- a new Typst's rendering, `just update` on its branch. A person merges it:
+  # dependabot-automerge.yml takes patch and minor bumps alone, and a commit's move is neither. A
+  # private repository's are not moved (the `nix` ecosystem is public repositories' alone): `nix
+  # flake update` by hand there
+  - package-ecosystem: "nix"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 1
+    # `chore(deps): ...` -- the flake is the dev shell and the checks: nothing a user of the
+    # package meets
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels: # each created once (Issues > Labels): one the repository lacks is ignored
+      - "dependencies"
+      - "nix"
+    # typst/packages' version, above: Dependabot would take its newest tag, maybe ahead of it
+    ignore:
+      - dependency-name: "package-check"
+    groups:
+      # every input, whatever its move: a commit has no semver level to sort it by
+      flake-inputs:
+        patterns:
+          - "*"

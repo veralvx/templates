@@ -1,0 +1,38 @@
+# A release tag (`just release`'s v<version>) makes the GitHub release, its notes the changelog's
+# section for that version -- refused if the changelog's first section is not it. cargo-generate
+# takes a template from the repository (`--git <url> --tag v<version> <folder>`); the release also
+# carries every tracked file as a tarball, for `cargo generate --path <unpacked> <folder>`: GitHub's
+# own source archives are `git archive`'s, which leaves out what typst/.gitattributes
+# export-ignores (a generated project's tooling, its tests).
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions: {}
+
+jobs:
+  release:
+    name: GitHub release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          .github/release-notes.sh CHANGELOG.md "$version" > "$RUNNER_TEMP/notes.md"
+          archive="$RUNNER_TEMP/templates-$version.tar.gz"
+          git ls-files -z | tar --null --files-from=- --transform "s|^|templates-$version/|" \
+            -czf "$archive"
+          gh release create "$GITHUB_REF_NAME" "$archive" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "templates $version" --notes-file "$RUNNER_TEMP/notes.md"

@@ -1,0 +1,75 @@
+{
+  description = "{{description}}";
+
+  # the unstable channel: its tools move with each `nix flake update` (Dependabot's, monthly), the
+  # dependency groups' pins with them (nix/checks.nix's `pins` names each, `just pins-update` moves
+  # them), then `just checks`
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs =
+    { self, nixpkgs }:
+    let
+      inherit (nixpkgs) lib;
+      # nixpkgs-unstable's platforms: it dropped x86_64-darwin in 26.11
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
+      forAllSystems = f: lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+    in
+    {
+      packages = forAllSystems (
+        pkgs:
+        let
+          built = import ./nix/packages.nix { inherit pkgs; };
+        in
+        built.packages
+        // {
+          inherit (built) default;
+        }
+{%- if project_kind != "lib" and container_image %}
+        # the command's OCI image (nix/image.nix): Linux's alone
+        // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          image = import ./nix/image.nix {
+            inherit pkgs;
+            package = built.default;
+          };
+        }
+{%- endif %}
+      );
+
+      # `nix run`: the command, where the project has one
+      apps = lib.mapAttrs (
+        _: packages:
+        lib.optionalAttrs (packages.default.meta ? mainProgram) {
+          default = {
+            type = "app";
+            program = lib.getExe packages.default;
+            meta.description = packages.default.meta.description;
+          };
+        }
+      ) self.packages;
+{% if project_kind != "lib" and container_image %}
+      # the image built is checked too -- its layers from the command's closure, which the
+      # stream alone would not run -- at the cost of its gzipped copy in the store
+      checks = forAllSystems (
+        pkgs:
+        import ./nix/checks.nix { inherit pkgs; }
+        // lib.optionalAttrs (self.packages.${pkgs.stdenv.hostPlatform.system} ? image) {
+          inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) image;
+        }
+      );
+{%- else %}
+      checks = forAllSystems (pkgs: import ./nix/checks.nix { inherit pkgs; });
+{%- endif %}
+
+      devShells = forAllSystems (pkgs: {
+        default = import ./nix/shell.nix { inherit pkgs; };
+      });
+
+      # `nix fmt`: nixfmt, shfmt and just's own, through treefmt (nix/formatter.nix);
+      # `nix fmt -- --ci` (`just nix`) formats, and fails if that changed a file
+      formatter = forAllSystems (pkgs: import ./nix/formatter.nix { inherit pkgs; });
+    };
+}

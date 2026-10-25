@@ -1,0 +1,5 @@
+# What `just lock-update python` may change, a path a line (dev/unlisted.sh's patterns).
+# dev/lock_core.py refuses an update that changes anything else, and so does locks.yml's
+# `propose` (dev/propose.sh), from its own checkout's copy.
+python/flake.lock
+python/pyproject.toml

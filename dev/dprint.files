@@ -1,0 +1,19 @@
+# What `just dprint-update` may change (dev/unlisted.sh's patterns, the last that matches deciding).
+# dev/dprint_plugins.py refuses an update that changes anything else, and so does
+# dprint-plugins.yml's `propose` (dev/propose.sh), from its own checkout's copy.
+# the root's Markdown and TOML, which its dprint formats -- not a template root's, nor
+# shared/template/'s: their Liquid is formatted in a generated project
+*.md
+*.toml
+!typst/*
+!python/*
+!rust/*
+!shared/template/*
+# each dprint.json, its plugins moved
+dprint.json
+*/dprint.json
+# shared/root/'s Markdown and TOML, formatted at the root, and copied into the templates by
+# `just sync`
+*/cliff.toml
+*/cog.toml
+*/.github/ISSUE_TEMPLATE/documentation.md

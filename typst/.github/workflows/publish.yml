@@ -1,0 +1,188 @@
+# A release tag (`just release`'s v<version>) publishes it:
+#   bundle    the directory typst/packages gets (a template's thumbnail rendered), made once and
+#             linted as typst/packages lints a submission, online (its repository's URL must answer)
+#   release   the GitHub release, from those files: the bundle as a tarball, the changelog's section
+#             as notes
+#   universe  once the repository variable UNIVERSE_FORK names your fork of typst/packages
+#             (`you/packages`): a branch on it holding the bundle, typst/packages' main beneath it,
+#             and its pull request, titled as typst/packages asks, linked in the run's summary --
+#             the submission is yours to send, its checklist yours to tick
+# Least privilege: the bundle job writes nothing; only the release job can write this repository;
+# only the fork's token (secrets.UNIVERSE_TOKEN) reaches the fork.
+name: Publish
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions: {}
+
+jobs:
+  bundle:
+    name: Bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      name: ${{ steps.bundle.outputs.name }}
+      version: ${{ steps.bundle.outputs.version }}
+      author-name: ${{ steps.bundle.outputs.author-name }}
+      author-email: ${{ steps.bundle.outputs.author-email }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+
+      # the flake's Typst, just and jq, and typst-package-check, at flake.lock's versions
+      - name: Install the flake's tools
+        run: .github/install-tools.sh
+
+      - name: Bundle, lint, and the notes
+        id: bundle
+        run: |
+          set -euo pipefail
+          name="$(just manifest package.name)"
+          version="$(just manifest package.version)"
+          # a tag's version is the one typst.toml declares at its commit
+          if [[ $GITHUB_REF_NAME != "v$version" ]]; then
+            echo "::error::$GITHUB_REF_NAME, but typst.toml declares $version" >&2
+            exit 1
+          fi
+          just online=true package-check
+          .github/release-notes.sh CHANGELOG.md "$version" > notes.md
+          tar -czf "$name-$version.tar.gz" -C "dist/preview/$name/$version" .
+          {
+            echo "name=$name"
+            echo "version=$version"
+            # the submission's author: the release's, as typst/packages asks an update's to be
+            echo "author-name=$(git log -1 --format=%an)"
+            echo "author-email=$(git log -1 --format=%ae)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Keep the bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle
+          path: dist/
+          # a template's dotfiles too (template/.gitignore): upload-artifact leaves them out by default
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Keep the tarball and the notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            *.tar.gz
+            notes.md
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    needs: bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: The tarball and the notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ needs.bundle.outputs.name }}
+          VERSION: ${{ needs.bundle.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$NAME-$VERSION.tar.gz" --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --title "$NAME $VERSION" --notes-file notes.md
+
+  universe:
+    name: Branch on the typst/packages fork
+    needs: bundle
+    # set once: Settings → Secrets and variables → Actions; CONTRIBUTING.md has the token's scopes
+    if: vars.UNIVERSE_FORK != ''
+    runs-on: ubuntu-latest
+    # its secret can be the environment's, which can admit release tags alone (Settings →
+    # Environments → universe → deployment tags `v*`)
+    environment:
+      name: universe
+    permissions: {}
+    steps:
+      # a secret cannot gate a job's `if:`, so its absence is said here, not as a failed checkout
+      - name: The fork's token
+        env:
+          TOKEN: ${{ secrets.UNIVERSE_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::UNIVERSE_FORK is set, but not the secret UNIVERSE_TOKEN (CONTRIBUTING.md, Publishing)" >&2
+            exit 1
+          fi
+
+      # the fork's main brought to typst/packages' first, then checked out: the branch below grows
+      # from the very commit the fork holds, so the push sends the package alone (from another
+      # base -- typst/packages' main checked out while it moved -- git could find nothing in
+      # common, and send the whole history)
+      - name: Sync the fork with typst/packages
+        env:
+          GH_TOKEN: ${{ secrets.UNIVERSE_TOKEN }}
+          FORK: ${{ vars.UNIVERSE_FORK }}
+        run: gh api --silent --method POST "repos/$FORK/merge-upstream" -f branch=main
+
+      # the package's directory alone (the repository holds every package ever published): the
+      # whole history, but no tree or file until needed (tree:0). Its token is the fork's, which
+      # the push below uses too.
+      - name: Checkout the fork
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ vars.UNIVERSE_FORK }}
+          ref: main
+          token: ${{ secrets.UNIVERSE_TOKEN }}
+          path: packages
+          fetch-depth: 0
+          filter: tree:0
+          sparse-checkout: packages/preview/${{ needs.bundle.outputs.name }}
+
+      - name: The bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bundle
+          path: dist/
+
+      - name: Commit and push
+        env:
+          NAME: ${{ needs.bundle.outputs.name }}
+          VERSION: ${{ needs.bundle.outputs.version }}
+          AUTHOR_NAME: ${{ needs.bundle.outputs.author-name }}
+          AUTHOR_EMAIL: ${{ needs.bundle.outputs.author-email }}
+          FORK: ${{ vars.UNIVERSE_FORK }}
+        run: |
+          set -euo pipefail
+          target="packages/packages/preview/$NAME/$VERSION"
+          if [ -e "$target" ]; then
+            echo "::error::typst/packages already holds $NAME $VERSION" >&2
+            exit 1
+          fi
+          mkdir -p "$target"
+          cp -R "dist/preview/$NAME/$VERSION/." "$target"
+          branch="$NAME-$VERSION"
+          cd packages
+          git switch --quiet --create "$branch"
+          git add --all
+          git -c user.name="$AUTHOR_NAME" -c user.email="$AUTHOR_EMAIL" commit --quiet -m "$NAME:$VERSION"
+          # forced: a re-run replaces the branch it pushed before
+          git push --force origin "HEAD:refs/heads/$branch"
+          # owner:branch, as GitHub names a fork's branch (an owner has one fork of a repository);
+          # quick_pull opens the form, which typst/packages' template fills
+          url="https://github.com/typst/packages/compare/main...${FORK%%/*}:$branch?quick_pull=1&title=$NAME%3A$VERSION"
+          {
+            echo "### $NAME $VERSION is on $FORK, branch \`$branch\`"
+            echo
+            echo "[Open the pull request]($url): fill in typst/packages' checklist, then send it."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Open the pull request: $url"

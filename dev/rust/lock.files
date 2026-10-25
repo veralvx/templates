@@ -1,0 +1,6 @@
+# What `just lock-update rust` may change, a path a line (dev/unlisted.sh's patterns).
+# dev/lock_core.py refuses an update that changes anything else, and so does locks.yml's
+# `propose` (dev/propose.sh), from its own checkout's copy.
+rust/flake.lock
+rust/cargo-generate.toml
+rust/dist-workspace.toml

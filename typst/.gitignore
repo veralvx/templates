@@ -1,0 +1,13 @@
+# `just bundle`'s output: the package as typst/packages gets it, the thumbnail in it
+/dist
+# tytanic's output and differences (it ignores them itself too, from within)
+/tests/**/out/
+/tests/**/diff/
+# the template compiled: package-check refuses a PDF, PNG or SVG beside the .typ it comes from
+# (a figure the template uses, under another name, is not ignored)
+/template/main.pdf
+/template/main.png
+/template/main.svg
+# Nix's build links, direnv's cache
+/result*
+/.direnv

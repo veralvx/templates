@@ -1,0 +1,10 @@
+# `just render-check`'s Python, and the caches of mypy and ruff run over dev/'s
+.venv/
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+# `just generate`'s projects
+/target
+# Nix's build links, direnv's cache
+/result*
+/.direnv

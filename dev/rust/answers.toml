@@ -1,0 +1,14 @@
+# `just generate rust <kind>`'s answers, and every generation the smoke test makes
+# (.github/workflows/smoke-rust.yml): cargo-generate's `--values-file`, which reads a [values]
+# table (TOML, not the `key=value` lines its --help gives). The kind is each generation's own
+# (`-d project_kind=<kind>`), and a `-d` wins over the file, wherever it stands: the smoke test's
+# combinations and refused names vary their answers so. render-check holds each to its prompt.
+[values]
+description = "Does a thing."
+author_name = "Jane Doe"
+author_email = "jane@example.com"
+github_username = "jane"
+license = "MIT OR Apache-2.0"
+msrv = "1.97"
+keywords = "cli,parser"
+categories = "command-line-utilities"

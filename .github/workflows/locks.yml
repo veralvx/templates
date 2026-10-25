@@ -1,0 +1,173 @@
+# Each template's flake.lock moved to its inputs' newest, and what follows it -- pins, a prompt,
+# dist's version -- as `just lock-update <template>` does (dev/<template>/lock.py), proposed as a
+# pull request: one a template, on the branch locks/<template>, which the next run rebuilds from the
+# default branch (made anew, a new pull request, if GitHub refuses the force-push) -- unless the
+# branch holds a person's commit, left as it is, the job failing, until its pull request is merged
+# or closed.
+# Opened with GITHUB_TOKEN, as github-actions[bot]: its workflows run once a user with write access
+# approves them, and the repository must let Actions create pull requests (Settings → Actions →
+# General). Nothing moved, no pull request; what is left to a person, its description says.
+#
+# Two jobs a template: `update` runs the repository's code and the inputs' (a new rust-overlay is
+# evaluated) with a token that reads alone, and hands its change over as an artifact; `propose`,
+# which may push and open pull requests, applies it with git and gh and runs nothing else -- and
+# refuses a change to anything dev/<template>/lock.files does not list, read from its own checkout,
+# or to more than tracked files' content (dev/propose.sh).
+name: Locks
+
+on:
+  schedule:
+    - cron: "0 5 1 * *" # monthly: the 1st, 05:00 UTC
+  workflow_dispatch:
+    inputs:
+      template:
+        description: "A template root; empty: every one"
+        required: false
+        default: ""
+
+permissions: {}
+
+# one run at a time: each rebuilds the branches the last one pushed
+concurrency:
+  group: locks
+
+jobs:
+  templates:
+    name: The templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # the pull requests are against the branch the run is on: by hand, only the default one (a
+      # schedule runs on it)
+      - name: On the default branch
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          REF: ${{ github.ref }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: dev/on-default-branch.sh
+
+      # every template root with a dev/<template>/lock.py, or the one named
+      - name: List them
+        id: list
+        env:
+          WANTED: ${{ inputs.template }}
+        run: |
+          set -euo pipefail
+          list=()
+          for update in dev/*/lock.py; do
+            template="${update#dev/}"
+            template="${template%/lock.py}"
+            if [ -f "$template/cargo-generate.toml" ] && { [ -z "$WANTED" ] || [ "$template" = "$WANTED" ]; }; then
+              list+=("$template")
+            fi
+          done
+          if [ "${#list[@]}" -eq 0 ]; then
+            echo "::error::no template root with a dev/<template>/lock.py named '$WANTED'" >&2
+            exit 1
+          fi
+          echo "list=$(printf '%s\n' "${list[@]}" | jq --raw-input . | jq --slurp --compact-output .)" >> "$GITHUB_OUTPUT"
+
+  update:
+    name: ${{ matrix.template }}, updated
+    needs: templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.templates.outputs.list) }}
+    steps:
+      # what `propose` reads first: `ok` only once the update is done, so a failed one is told from
+      # a lost artifact
+      - name: Begin
+        run: |
+          mkdir "$RUNNER_TEMP/lock"
+          echo failed > "$RUNNER_TEMP/lock/status"
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+
+      # the root lock's just, the dev shell's
+      - name: Install just
+        run: dev/nix-tools.sh . just
+
+      # `just generate`'s, for python's and rust's lock, made in a generated project: the floor
+      - name: Install cargo-generate
+        run: dev/install-cargo-generate.sh
+
+      - name: Update the lock, and what follows it
+        env:
+          TEMPLATE: ${{ matrix.template }}
+        run: |
+          set -euo pipefail
+          # `just generate` commits each project it makes
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          just lock-update "$TEMPLATE" --summary "$RUNNER_TEMP/lock/summary.md"
+          # the change, for `propose`: empty if nothing moved
+          git add --all
+          git diff --cached --binary > "$RUNNER_TEMP/lock/changes.patch"
+          echo ok > "$RUNNER_TEMP/lock/status"
+
+      - name: Hand it over
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lock-${{ matrix.template }}
+          path: ${{ runner.temp }}/lock/
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true # a re-run's
+
+  propose:
+    name: ${{ matrix.template }}, proposed
+    needs: [templates, update]
+    # each template's own: one whose update failed leaves the others to propose theirs
+    if: ${{ !cancelled() && needs.templates.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # the branch
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.templates.outputs.list) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Take it
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lock-${{ matrix.template }}
+          path: ${{ runner.temp }}/lock
+
+      # dev/propose.sh, from this checkout: the change applied, held to dev/<template>/lock.files
+      # (its own copy), proposed on locks/<template>; the commit's scope the template's, and
+      # shared's when its lock's copy moved (AGENTS.md's), which propose.sh adds
+      - name: Propose it
+        env:
+          TEMPLATE: ${{ matrix.template }}
+          BOT: 41898282+github-actions[bot]@users.noreply.github.com
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dev/propose.sh "$RUNNER_TEMP/lock" "dev/$TEMPLATE/lock.files" "locks/$TEMPLATE" \
+            "build($TEMPLATE): update $TEMPLATE's flake.lock"

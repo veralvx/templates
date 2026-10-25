@@ -1,0 +1,690 @@
+# The double-brace interpolation below is just's own. No recipe names the package: what one needs
+# to know of it, it reads at run time from typst.toml (`just manifest`), and whether it is a
+# template package from its [template] table.
+#
+# Formatted with `just --fmt --unstable`. The commands are the workflows' (.github/workflows/).
+
+# The Typst that compiles the README's examples and the template, as `just typst=<command> ...`
+# sets it: `just floor` gives the oldest. The bundle's thumbnail is always the flake's `typst`'s.
+export typst := "typst"
+
+# `just online=true package-check` checks the URLs too, as publish.yml does.
+export online := "false"
+
+[doc("List the recipes")]
+default:
+    @just --list --unsorted
+
+# Typst's own TOML reader (`typst eval`, Typst 0.15): no other parser needed. A missing key prints
+# nothing; an unreadable typst.toml fails.
+[doc("A typst.toml value: just manifest package.version")]
+[positional-arguments]
+manifest key:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    typst eval --root . --input "key=$1" \
+        'sys.inputs.key.split(".").fold(toml("/typst.toml"), (value, key) => if type(value) == dictionary { value.at(key, default: none) })' \
+        | jq -r '. // empty'
+
+# Every formatter a check holds the files to. The Nix last, through `nix fmt` (flake.nix's
+# formatter: nixfmt, and shfmt, typstyle and just's own again): without Nix, it stops there, the
+# rest formatted.
+[doc("Format the Typst code, the shell scripts, the justfile, the Markdown and the TOML, then the Nix (modifies files)")]
+format:
+    just typstyle --inplace
+    just shfmt --write
+    just shfmt-recipes
+    just --fmt --unstable
+    dprint fmt
+    nix fmt
+
+[doc("The Typst code's format, checked (typstyle)")]
+format-check:
+    just typstyle --check
+
+# tinymist's linter, on what Universe ships: the package from its entrypoint -- every local module
+# it reaches, never a package's; not tests/, run by tytanic, whose `catch` Typst does not know --
+# and a template package's template, its import of this package read from the work tree. Compiled
+# by tinymist's own Typst with the fonts Typst embeds alone; any warning fails, as in every compile
+# here, and a lint cannot be silenced at the site: fix the cause.
+[doc("The Typst code linted (tinymist): the package from its entrypoint, and a template package's template")]
+lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    lint() {
+        if ! tinymist lint --ignore-system-fonts --diagnostic-format short "$@" > "$work/out" 2>&1 \
+            || grep -q -E ': (warning|error): ' "$work/out"; then
+            cat "$work/out" >&2
+            echo "error: tinymist lint $*" >&2
+            exit 1
+        fi
+    }
+    lint --root . "$(just manifest package.entrypoint)"
+    template="$(just manifest template.path)"
+    if [ -n "$template" ]; then
+        # @preview/<name>:<version>, as the template imports it: this work tree
+        name="$(just manifest package.name)"
+        mkdir -p "$work/packages/preview/$name"
+        ln -s "$PWD" "$work/packages/preview/$name/$(just manifest package.version)"
+        lint --root "$template" --package-path "$work/packages" "$template/$(just manifest template.entrypoint)"
+    fi
+
+# typstyle over every .typ file git does not ignore -- the untracked ones too, which a commit would
+# add -- that exists: a deletion not yet staged is still git's.
+[positional-arguments]
+[private]
+typstyle mode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # a process substitution's failure goes unseen (set -e): outside a repository, ls-files' would
+    git rev-parse --is-inside-work-tree > /dev/null
+    files=()
+    while IFS= read -r -d '' file; do
+        if [ -f "$file" ]; then files+=("$file"); fi
+    done < <(git ls-files -z --cached --others --exclude-standard '*.typ')
+    # with no file, typstyle would read stdin
+    if [ "${#files[@]}" -gt 0 ]; then
+        typstyle "$1" "${files[@]}"
+    fi
+
+[doc("The tests (tytanic): each under tests/, and a template package's template as `typst init` makes it")]
+test:
+    tt run --no-fail-fast
+
+# tytanic rewrites the references of the tests named, or of every failing one: look at what changed
+# (tests/<name>/ref/) before committing it.
+[doc("A visual test's new reference, once the change is intended: just update [test...]")]
+[positional-arguments]
+update *tests:
+    tt update "$@"
+
+# Universe asks that a release's examples import that release; `just release` moves them all.
+[doc("Every @preview/<name>:<version> import (outside the changelog) names typst.toml's version")]
+versions-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # git grep's failure would read as no stale import (`|| true`, for one that found none)
+    git rev-parse --is-inside-work-tree > /dev/null
+    name="$(just manifest package.name)"
+    version="$(just manifest package.version)"
+    # file:line:import, each import on its own, those of another version kept
+    stale="$(git grep -n -o -E "@preview/$name:[0-9]+\.[0-9]+\.[0-9]+" -- ':!CHANGELOG.md' \
+        | grep -v -E ":@preview/$name:${version//./\\.}$" || true)"
+    if [ -n "$stale" ]; then
+        printf '%s\n' "$stale" >&2
+        echo "error: these imports are not typst.toml's version, $version" >&2
+        exit 1
+    fi
+
+# The repository less .gitattributes' export-ignore paths (git archive), laid out as a package path
+# holds it, so `--package-path dist` imports it as @preview -- and for a template package, the
+# thumbnail, rendered from a `typst init` of the bundle: the template as initialized, as Universe
+# asks. It is git's files as they stand, uncommitted changes too: a new file once `git add`ed.
+[doc("The package as typst/packages gets it, into dist/preview/<name>/<version>")]
+bundle:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! git rev-parse --quiet --verify HEAD > /dev/null; then
+        echo "error: no commit yet: the bundle is git's files -- commit first" >&2
+        exit 1
+    fi
+    out="dist/preview/$(just manifest package.name)/$(just manifest package.version)"
+    rm -rf dist
+    mkdir -p "$out"
+    # the work tree as a commit (`git stash create`, which changes nothing), or HEAD when clean;
+    # the index refreshed first: a file touched but unchanged fails `stash create`, silently
+    git update-index -q --refresh
+    tree="$(git -c user.name=bundle -c user.email=bundle@localhost stash create)"
+    git archive --format=tar "${tree:-HEAD}" | tar -x -C "$out"
+    # A published version never changes, so nothing goes unnoticed into one: the bundle holds the
+    # package -- typst.toml, the README, the licences, the changelog, the entrypoint's directory,
+    # the template -- and what typst.toml's `exclude` names (documentation the README links).
+    # Anything else is a file new to the repository: export-ignore it, or give it a place.
+    source="$(dirname "$(just manifest package.entrypoint)")"
+    template="$(just manifest template.path)"
+    excludes="$(just manifest package.exclude | jq -r '.[]?')"
+    unexpected=0
+    while IFS= read -r file; do
+        case "$file" in
+            typst.toml | README.md | CHANGELOG.md | LICENSE | LICENSE-*) continue ;;
+        esac
+        if [ "$source" = . ] || [[ $file == "$source"/* ]]; then continue; fi
+        if [ -n "$template" ] && [[ $file == "${template%/}"/* ]]; then continue; fi
+        # exclude's globs, approximately as gitignore reads them (a `*` here crosses a `/`)
+        listed=false
+        while IFS= read -r glob; do
+            glob="${glob#./}"
+            glob="${glob#/}"
+            glob="${glob%/}"
+            # shellcheck disable=SC2053 # the glob unquoted: a pattern, not a string
+            if [ -n "$glob" ] && [[ $file == $glob || $file == $glob/* || $file == */$glob ]]; then
+                listed=true
+            fi
+        done <<< "$excludes"
+        if [ "$listed" = false ]; then
+            echo "error: $file would go to typst/packages: export-ignore it in .gitattributes, move it under $source/, or, if the README links it, list it in typst.toml's exclude" >&2
+            unexpected=1
+        fi
+    done < <(cd "$out" && find . ! -type d | sed 's|^\./||' | sort)
+    if [ "$unexpected" -ne 0 ]; then
+        exit 1
+    fi
+    thumbnail="$(just manifest template.thumbnail)"
+    if [ -n "$thumbnail" ]; then
+        # typst/packages' bundler refuses a thumbnail whose longer edge is under 1080 px, or over
+        # 3 MiB. 250 ppi, as its guide suggests, makes an A4 page 2923 px; a smaller page is
+        # rendered again at the ppi that reaches 1080.
+        png="$out/$thumbnail"
+        ppi=250
+        while :; do
+            just render typst "$png" --format png --pages 1 --ppi "$ppi"
+            # the IHDR chunk: width, then height, big-endian, from byte 16
+            read -r w1 w2 w3 w4 h1 h2 h3 h4 < <(od -An -tu1 -j16 -N8 "$png")
+            width=$((w1 << 24 | w2 << 16 | w3 << 8 | w4))
+            height=$((h1 << 24 | h2 << 16 | h3 << 8 | h4))
+            edge=$((width > height ? width : height))
+            if [ "$edge" -ge 1080 ]; then break; fi
+            ppi=$((ppi * 1080 / edge + 1))
+        done
+        size="$(wc -c < "$png")"
+        if [ "$size" -gt $((3 * 1024 * 1024)) ]; then
+            echo "error: $png is $size bytes, over Universe's 3 MiB: make the first page lighter, or compress it (oxipng)" >&2
+            exit 1
+        fi
+    fi
+    echo "$out"
+
+# A template package's project as `typst init` makes it from the bundle, compiled by the Typst
+# given -- with the fonts Typst embeds alone, which every Typst has -- into OUTPUT. A warning is
+# a failure: a project should start clean. (Typst's stderr also carries a dependency's download
+# progress: only a diagnostic, in the short format, counts.)
+[positional-arguments]
+[private]
+render compiler output *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    compiler="$1"
+    output="$2"
+    shift 2
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    spec="@preview/$(just manifest package.name):$(just manifest package.version)"
+    if ! "$compiler" init "$spec" "$work/project" --package-path "$PWD/dist" > "$work/init" 2>&1; then
+        cat "$work/init" >&2
+        exit 1
+    fi
+    project="$work/project"
+    main="$project/$(just manifest template.entrypoint)"
+    if ! "$compiler" compile --root "$project" --package-path "$PWD/dist" --ignore-system-fonts \
+        --diagnostic-format short "$@" "$main" "$output" 2> "$work/stderr" \
+        || grep -q -E ': (warning|error): ' "$work/stderr"; then
+        cat "$work/stderr" >&2
+        echo "error: $spec's template, initialized, does not compile cleanly with $compiler" >&2
+        exit 1
+    fi
+
+[doc("A template package's template, initialized from the bundle, compiled")]
+template-check: bundle
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "$(just manifest template.path)" ]; then
+        echo "No [template] in typst.toml; nothing to initialize."
+        exit 0
+    fi
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    just render "$typst" "$work/main.pdf"
+
+# Universe shows the README and asks that its examples compile; its linter also reads a block with
+# no language as Typst. Each block alone, as a reader would paste it, importing the bundle: every
+# fenced block CommonMark's way -- backticks or tildes, three or more, indented in a list too, the
+# block closed by a fence of the same character at least as long.
+[doc("Every typ block in README.md compiled against the bundle")]
+readme-check: bundle
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    # each typ (or typst) block into line-<its first line>.typ, its fence's indentation removed
+    awk -v dir="$work" '
+        function fence(line) {
+            if (!match(line, /^[ \t]*(```+|~~~+)/)) return ""
+            indent = line
+            sub(/[^ \t].*/, "", indent)
+            mark = substr(line, length(indent) + 1, RLENGTH - length(indent))
+            return mark
+        }
+        {
+            f = fence($0)
+            if (!open && f != "") {
+                open = f
+                margin = length(indent)
+                lang = substr($0, RLENGTH + 1)
+                sub(/^[ \t]*/, "", lang)
+                sub(/[ \t{,].*/, "", lang)
+                if (lang == "") {
+                    printf "README.md:%d: a code block with no language, which Universe reads as Typst: name it (typ to compile it, text not to)\n", NR > "/dev/stderr"
+                    bad = 1
+                }
+                # as package-check reads it: case aside
+                lang = tolower(lang)
+                keep = lang == "typ" || lang == "typst"
+                if (keep) file = sprintf("%s/line-%05d.typ", dir, NR + 1)
+                next
+            }
+            if (open && f != "" && substr(f, 1, 1) == substr(open, 1, 1) && length(f) >= length(open) && $0 ~ /^[ \t]*[`~]+[ \t]*$/) {
+                if (keep) close(file)
+                open = ""
+                keep = 0
+                next
+            }
+            if (keep) {
+                line = $0
+                for (i = 0; i < margin && substr(line, 1, 1) ~ /[ \t]/; i++) line = substr(line, 2)
+                print line > file
+            }
+        }
+        END { exit bad }
+    ' README.md
+    count=0
+    for block in "$work"/line-*.typ; do
+        [ -e "$block" ] || continue
+        count=$((count + 1))
+        line="${block##*/line-}"
+        line="$((10#${line%.typ}))"
+        # only a diagnostic fails it, not a dependency's download progress (see `render`)
+        if ! "$typst" compile --root "$work" --package-path "$PWD/dist" --ignore-system-fonts \
+            --diagnostic-format short "$block" "$work/out.pdf" 2> "$work/stderr" \
+            || grep -q -E ': (warning|error): ' "$work/stderr"; then
+            cat "$work/stderr" >&2
+            echo "README.md:$line: this block does not compile cleanly with $typst" >&2
+            exit 1
+        fi
+    done
+    if [ "$count" -eq 0 ]; then
+        echo "error: README.md has no typ example, which Universe asks for" >&2
+        exit 1
+    fi
+    echo "README.md: $count typ blocks compiled with $typst"
+
+# typst/packages runs the same tool on a submission. Offline unless `online=true` (the repository's
+# URL answers once it is public: publish.yml checks it); its warnings fail too.
+[doc("typst-package-check on the bundle, as typst/packages runs it")]
+package-check: bundle
+    #!/usr/bin/env bash
+    set -euo pipefail
+    package="dist/preview/$(just manifest package.name)/$(just manifest package.version)"
+    case "$online" in
+        false) typst-package-check check --offline "$package" ;;
+        true) typst-package-check check "$package" ;;
+        *)
+            echo "error: online is true or false (got '$online')" >&2
+            exit 1
+            ;;
+    esac
+
+# setup-typst installs each version as typst-<version> too, which is the name looked for here.
+[doc("The README and a template package's template on typst.toml's `compiler`, the oldest Typst supported")]
+floor:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    compiler="$(just manifest package.compiler)"
+    if [ -z "$compiler" ]; then
+        echo "error: typst.toml declares no compiler" >&2
+        exit 1
+    fi
+    if ! command -v "typst-$compiler" > /dev/null; then
+        echo "error: typst-$compiler is not on PATH: install Typst $compiler under that name" >&2
+        exit 1
+    fi
+    just typst="typst-$compiler" readme-check template-check
+
+# A template package's template imports @preview/<name>: `typst init` of it compiles once the bundle
+# is installed as `preview` -- which shadows the published version of the same number, until
+# removed from the package path.
+[doc("The bundle into Typst's package path: just install [namespace], then #import \"@local/<name>:<version>\"")]
+[positional-arguments]
+install namespace="local": bundle
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "$1" in
+        *[!a-z0-9-]* | "")
+            echo "error: a namespace is lowercase letters, digits and hyphens (got '$1')" >&2
+            exit 1
+            ;;
+    esac
+    name="$(just manifest package.name)"
+    version="$(just manifest package.version)"
+    # -e: a missing key fails, rather than install under ./null
+    target="$(typst info --format json | jq -er '.packages."package-path"')/$1/$name/$version"
+    rm -rf "$target"
+    mkdir -p "$target"
+    cp -R "dist/preview/$name/$version/." "$target"
+    echo "Installed: #import \"@$1/$name:$version\""
+
+[doc("Markdown and TOML formatted (dprint.json)")]
+dprint-check:
+    dprint check
+
+[doc("dprint's plugins to their latest releases (dprint.json), then the Markdown and TOML rechecked")]
+dprint-update:
+    dprint config update
+    dprint check
+
+[doc("Every commit conventional (cog.toml)")]
+cog:
+    cog check
+
+# actionlint runs shellcheck on each `run:` script too, when it is on PATH.
+[doc("The workflows linted (actionlint)")]
+actionlint:
+    actionlint
+
+# shellcheck and shfmt over every shell script git does not ignore -- shfmt finds them, by extension
+# or shebang, and formats them as .editorconfig says -- and over this justfile's shell script
+# recipes (a sh, bash, dash or ksh shebang), which no file holds: each taken from `just --dump`,
+# the names the justfile exports declared before it for shellcheck (their values are just's
+# expressions, not shell's), formatted in the justfile's own style (4 spaces). A script recipe
+# takes its values as arguments, never as `{{ }}` spliced into its text, and names its shell in a
+# shebang, not a `[script]` attribute (whose body holds none to read): both are refused here.
+[doc("The shell: shellcheck and shfmt over the scripts, the git hooks and the justfile's script recipes")]
+shell-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    failed=0
+    just shfmt --diff || failed=1
+    scripts=()
+    while IFS= read -r file; do
+        scripts+=("$file")
+    done < <(just shfmt --find)
+    if [ "${#scripts[@]}" -gt 0 ]; then
+        shellcheck "${scripts[@]}" || failed=1
+    fi
+    dump="$(just --dump --dump-format json)"
+    while IFS= read -r recipe; do
+        if jq -e --arg recipe "$recipe" '.recipes[$recipe].attributes | any(type == "object" and has("script"))' <<< "$dump" > /dev/null; then
+            echo "error: $recipe: a [script] recipe -- name its shell in a shebang instead" >&2
+            failed=1
+            continue
+        fi
+        # its shebang's program, or the one `env` runs, past env's options (`-S`)
+        read -r -a shebang < <(jq -r --arg recipe "$recipe" '.recipes[$recipe].body[0][0] | ltrimstr("#!")' <<< "$dump")
+        program="${shebang[0]-}"
+        program="${program##*/}"
+        if [ "$program" = env ]; then
+            program=""
+            for word in "${shebang[@]:1}"; do
+                if [[ $word != -* ]]; then
+                    program="$word"
+                    break
+                fi
+            done
+        fi
+        case "$program" in
+            sh | bash | dash | ksh) ;;
+            *) continue ;;
+        esac
+        jq -r --arg recipe "$recipe" '
+            .recipes[$recipe].body
+            | map(map(if type == "string" then . else error("\($recipe): an interpolation in a script recipe: pass the value as an argument") end) | join(""))
+            | join("\n")
+        ' <<< "$dump" > "$work/$recipe" || {
+            failed=1
+            continue
+        }
+        # after the shebang, the variables just exports to it: the `export`ed assignments and
+        # `$`-parameters, or every one under `set export`
+        {
+            head -n 1 "$work/$recipe"
+            jq -r --arg recipe "$recipe" '
+                .settings.export as $all
+                | (.assignments[], .recipes[$recipe].parameters[])
+                | select($all or .export)
+                | "export \(.name)="
+            ' <<< "$dump"
+            tail -n +2 "$work/$recipe"
+        } > "$work/$recipe.with-exports"
+        (cd "$work" && shellcheck --shell="$program" "$recipe.with-exports") || failed=1
+        (cd "$work" && shfmt --diff --indent 4 --case-indent --space-redirects --binary-next-line "$recipe") || failed=1
+    done < <(jq -r '.recipes | to_entries[] | select(.value.shebang) | .key' <<< "$dump")
+    exit "$failed"
+
+# shfmt over every shell script git does not ignore and that exists (shfmt finds them, by extension
+# or shebang): `just shfmt --find` lists them, `--diff` checks, `--write` formats.
+[positional-arguments]
+[private]
+shfmt mode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # a process substitution's failure goes unseen (set -e): outside a repository, ls-files' would
+    git rev-parse --is-inside-work-tree > /dev/null
+    files=()
+    while IFS= read -r -d '' file; do
+        if [ -f "$file" ]; then files+=("$file"); fi
+    done < <(git ls-files -z --cached --others --exclude-standard)
+    # with no file, shfmt would read stdin; a command substitution, so a failing shfmt stops here
+    found=""
+    if [ "${#files[@]}" -gt 0 ]; then found="$(shfmt --find "${files[@]}")"; fi
+    if [ -z "$found" ]; then exit 0; fi
+    scripts=()
+    while IFS= read -r file; do
+        scripts+=("$file")
+    done <<< "$found"
+    case "$1" in
+        --find) printf '%s\n' "${scripts[@]}" ;;
+        *) shfmt "$1" "${scripts[@]}" ;;
+    esac
+
+# The justfile's own script recipes formatted as `just shell-check` holds them: each sh, bash, dash
+# or ksh recipe taken from `just --dump`, through shfmt in the justfile's style, and put back in
+# its place, 4 spaces in. A `[script]` recipe, or one with a `{{ }}` in it, is shell-check's to
+# refuse, and is left as it is.
+[private]
+shfmt-recipes:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    dump="$(just --dump --dump-format json)"
+    # the shebang's program, or the one `env` runs, past env's options (`-S`), as shell-check reads it
+    names="$(jq -r '
+        .recipes[]
+        | select(.shebang)
+        | select(.attributes | any(type == "object" and has("script")) | not)
+        | select(all(.body[][]; type == "string"))
+        | select(
+            (.body[0][0] | ltrimstr("#!") | [splits("[ \t]+")] | map(select(. != ""))) as $words
+            | ($words[0] | split("/") | last) as $program
+            | if $program == "env" then [$words[1:][] | select(startswith("-") | not)][0] else $program end
+            | IN("sh", "bash", "dash", "ksh")
+        )
+        | .name
+    ' <<< "$dump")"
+    if [ -z "$names" ]; then exit 0; fi
+    while IFS= read -r recipe; do
+        jq -r --arg recipe "$recipe" '.recipes[$recipe].body | map(join("")) | join("\n")' <<< "$dump" > "$work/body"
+        shfmt --indent 4 --case-indent --space-redirects --binary-next-line "$work/body" > "$work/formatted"
+        if cmp -s "$work/body" "$work/formatted"; then continue; fi
+        # the recipe's line, then its body in place of the old: every line to the next at the
+        # margin, less the blank lines before that one
+        awk -v recipe="$recipe" -v formatted="$work/formatted" '
+            function body(line) {
+                while ((getline line < formatted) > 0) print (line == "" ? "" : "    " line)
+                close(formatted)
+            }
+            state == 1 && $0 == "" { blanks++; next }
+            state == 1 && /^[ \t]/ { blanks = 0; next }
+            state == 1 {
+                body()
+                for (; blanks > 0; blanks--) print ""
+                state = 2
+            }
+            state == 0 && $0 ~ ("^@?" recipe "([ \t][^:]*)?:") && $0 !~ ("^" recipe "[ \t]*:=") { state = 1 }
+            { print }
+            END { if (state == 1) body() }
+        ' justfile > "$work/justfile"
+        cat "$work/justfile" > justfile
+    done <<< "$names"
+
+# `nix fmt -- --ci` formats -- treefmt has no check-only mode -- and fails if that changed a file:
+# look at the change, then commit it. The flake's `format` check is the same verdict, on a copy.
+[doc("The flake: its formatter's verdict (`nix fmt`), every system evaluated, this one's checks built")]
+nix:
+    nix fmt -- --ci
+    nix flake check --no-build --all-systems
+    nix flake check
+
+# `nix` last: the slowest, and the one a machine without Nix cannot run -- every other has passed by
+# then. The flake sees git's files only: a new file is invisible to it until `git add`ed. The
+# oldest Typst (`just floor`) is CI's.
+[doc("Every check, the flake's last")]
+checks: format-check lint shell-check actionlint test versions-check readme-check template-check package-check dprint-check cog nix
+
+# Opt-in, as every git hook is: a clone never installs one, so CI stays the gate.
+# `git config --unset core.hooksPath` turns them off again.
+[doc("Use .githooks: formatting, the shell, the workflows, the imports' versions and dprint before a commit; Conventional Commits for the message and before a push")]
+install-hooks:
+    git config core.hooksPath .githooks
+
+# git-cliff, offline, with the repository the compare links need read from typst.toml's
+# `repository` (cliff.toml is project-agnostic).
+[doc("The changelog (cliff.toml): `just changelog --unreleased` previews the next release")]
+[positional-arguments]
+changelog *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    url="$(just manifest package.repository)"
+    case "$url" in
+        https://github.com/*/*)
+            repo="${url#https://github.com/}"
+            repo="${repo%.git}"
+            repo="${repo%/}"
+            ;;
+        *)
+            echo "error: typst.toml's repository is not a GitHub URL (got '$url')" >&2
+            exit 1
+            ;;
+    esac
+    git cliff --offline --github-repo "$repo" "$@"
+
+# Every step here, in order -- nothing in a hook or another tool's config. The first release is the
+# version typst.toml declares, whatever the level. The tag publishes (publish.yml): the GitHub
+# release, and the branch on your typst/packages fork. No tests here: what is released is origin's
+# main, which CI checks.
+[doc("Release: just release <major|minor|patch> -- version, imports, changelog, commit, tag, push")]
+[positional-arguments]
+release level:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # 0. The level -- passed as $1, never spliced into this script's text
+    case "$1" in
+        major | minor | patch) level="$1" ;;
+        *)
+            echo "error: the level must be major, minor or patch (got '$1')" >&2
+            exit 1
+            ;;
+    esac
+
+    # 1. From a clean main that is origin's -- pushed, so the commit released is the one CI ran on
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "error: the working tree is not clean: commit or stash first" >&2
+        exit 1
+    fi
+    if [ "$(git branch --show-current)" != main ]; then
+        echo "error: a release is cut from main" >&2
+        exit 1
+    fi
+    git fetch origin
+    if ! git rev-parse --quiet --verify origin/main > /dev/null; then
+        echo "error: origin has no main: push it first" >&2
+        exit 1
+    fi
+    if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+        echo "error: main is not origin/main: push (and let CI pass) or pull first" >&2
+        exit 1
+    fi
+
+    # 2. The version: the declared one at the first release (no tag yet), else the level's bump --
+    #    Typst's versions are MAJOR.MINOR.PATCH alone
+    name="$(just manifest package.name)"
+    declared="$(just manifest package.version)"
+    if [ -z "$(git tag --list 'v[0-9]*')" ]; then
+        version="$declared"
+    else
+        IFS=. read -r major minor patch <<< "$declared"
+        case "$level" in
+            major) version="$((major + 1)).0.0" ;;
+            minor) version="$major.$((minor + 1)).0" ;;
+            patch) version="$major.$minor.$((patch + 1))" ;;
+        esac
+    fi
+    tag="v$version"
+    if git rev-parse --quiet --verify "refs/tags/$tag" > /dev/null; then
+        echo "error: $tag is already tagged" >&2
+        exit 1
+    fi
+
+    # 3. Something to release: a commit since the last tag that enters the changelog
+    entries="$(just changelog --unreleased --context | jq '[.[].commits | length] | add // 0')"
+    if [ "$entries" -eq 0 ]; then
+        echo "error: nothing to release -- no commit since the last tag would enter the changelog" >&2
+        exit 1
+    fi
+
+    # If anything below fails before the commit, put back what it changed: the tree was clean, so
+    # HEAD's files are exactly that, and a changelog the first release created goes.
+    restore() {
+        echo "Release aborted -- restoring the files it changed." >&2
+        git reset --quiet --hard HEAD
+        if ! git cat-file -e HEAD:CHANGELOG.md 2> /dev/null; then
+            rm -f CHANGELOG.md
+        fi
+    }
+    trap restore ERR
+
+    # 4. The version, written: typst.toml's (its first top-level `version`, [package]'s), and every
+    #    import of the package (versions-check holds them together); none at the first release
+    if [ "$version" != "$declared" ]; then
+        awk -v version="$version" '
+            /^version[[:space:]]*=/ && !done { print "version = \"" version "\""; done = 1; next }
+            1
+        ' typst.toml > typst.toml.tmp
+        mv typst.toml.tmp typst.toml
+        pattern="@preview/$name:${declared//./\\.}"
+        { git grep -l -z -F "@preview/$name:$declared" -- ':!CHANGELOG.md' || true; } \
+            | while IFS= read -r -d '' file; do
+                # the version whole: not followed by a digit (a sentence's full stop may follow)
+                sed "s|$pattern\([^0-9]\)|@preview/$name:$version\1|g; s|$pattern\$|@preview/$name:$version|" \
+                    "$file" > "$file.tmp"
+                mv "$file.tmp" "$file"
+            done
+    fi
+    if [ "$(just manifest package.version)" != "$version" ]; then
+        # an explicit exit runs no ERR trap: restore first
+        echo "error: typst.toml's version is not $version" >&2
+        restore
+        exit 1
+    fi
+    just versions-check
+
+    # 5. The changelog, the release's section on top
+    just changelog --tag "$tag" --output CHANGELOG.md
+
+    # 6. Commit, then change the trap: a refused commit (a git hook) still restores the files, but
+    #    once committed, a failure is finished by hand -- a re-run would bump again
+    git add --all
+    git commit -m "chore(release): $tag"
+    finish() {
+        echo "error: $tag is committed; finish it by hand: git tag -a $tag -m 'Release $tag' (unless tagged), then git push --atomic origin main $tag" >&2
+    }
+    trap finish ERR
+    git tag -a "$tag" -m "Release $tag"
+
+    # 7. The commit and the tag together, both or neither
+    git push --atomic origin main "$tag"
+    echo "Released $tag: publish.yml takes it from here."

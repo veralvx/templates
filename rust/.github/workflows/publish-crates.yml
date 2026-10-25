@@ -1,0 +1,149 @@
+# The release's crates published to crates.io, `cargo publish --workspace` at the tag (every member
+# in dependency order). Called, never run on its own: by dist's release.yml once its binaries are
+# built and its GitHub release made (dist-workspace.toml's `publish-jobs`: no crate without its
+# binaries), or, with no dist (a library), by publish.yml on the tag. A version crates.io already
+# holds is passed over, so a re-run after a partial publish completes it; a project whose packages
+# are all `publish = false` publishes nothing. The crates are built (the publish's own dry run)
+# before the token is minted, which crates.io lets live 30 minutes.
+#
+# The token is crates.io's Trusted Publishing, minted for the run: no secret stored. crates.io
+# trusts a workflow only for a crate that exists, so a crate new to it stops this job, named: its
+# first version is published by hand from the tag, its Trusted Publishing set -- this repository,
+# the calling workflow (release.yml, or a library's publish.yml: crates.io reads the caller's
+# name), the environment `crates-io` -- then the failed jobs re-run (CONTRIBUTING.md, First steps).
+name: Publish crates
+
+on:
+  workflow_call:
+    inputs:
+      # dist's release plan (JSON), which dist passes to every custom job: unread here
+      plan:
+        required: false
+        type: string
+
+permissions: {}
+
+jobs:
+  crates-io:
+    name: crates.io
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+    permissions:
+      contents: read
+      id-token: write # the OIDC token crates.io exchanges for its own
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # rust-toolchain.toml's, the MSRV's: the dry run builds each crate with the toolchain
+      # the project is checked on (cargo 1.90 or later, which `--workspace` needs)
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+
+      # every publishable package at the tag's version, and those crates.io holds already
+      - name: What to publish
+        id: crates
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if [[ $GITHUB_REF_TYPE != tag || $version == "$GITHUB_REF_NAME" ]]; then
+            echo "::error::not a release tag (v<version>): $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          packages="$(cargo metadata --no-deps --locked --format-version 1 \
+            | jq -r '.packages[] | select(.publish == null or (.publish | length > 0))
+              | "\(.name) \(.version)"')"
+          if [ -z "$packages" ]; then
+            echo "::notice::every package is publish = false: nothing for crates.io"
+            {
+              echo "packages=0"
+              echo "remaining=0"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          api() {
+            curl -sS -o /dev/null -w '%{http_code}' \
+              -A "$GITHUB_REPOSITORY release (github.com/$GITHUB_REPOSITORY)" \
+              "https://crates.io/api/v1/crates/$1"
+          }
+          exclude=()
+          new=()
+          remaining=0
+          while read -r name have; do
+            if [ "$have" != "$version" ]; then
+              echo "::error::$name is $have, not the tag's $version" >&2
+              exit 1
+            fi
+            status="$(api "$name/$version")"
+            case "$status" in
+              200)
+                echo "$name $version: on crates.io already"
+                exclude+=(--exclude "$name")
+                ;;
+              404)
+                remaining=$((remaining + 1))
+                crate="$(api "$name")"
+                case "$crate" in
+                  200) ;;
+                  404) new+=("$name") ;;
+                  *)
+                    echo "::error::crates.io answered $crate for $name" >&2
+                    exit 1
+                    ;;
+                esac
+                ;;
+              *)
+                echo "::error::crates.io answered $status for $name $version" >&2
+                exit 1
+                ;;
+            esac
+          done <<< "$packages"
+          if [ "${#new[@]}" -gt 0 ]; then
+            hand="git checkout $GITHUB_REF_NAME, cargo login,"
+            hand+=" cargo publish --workspace${exclude[*]:+ ${exclude[*]}}"
+            after="Trusted Publishing set on each, the failed jobs re-run"
+            echo "::error::new to crates.io: ${new[*]}. A first version is published by hand" \
+              "($hand), then $after (CONTRIBUTING.md, First steps)" >&2
+            exit 1
+          fi
+          {
+            echo "packages=$(wc -l <<< "$packages")"
+            echo "remaining=$remaining"
+            echo "exclude=${exclude[*]}"
+          } >> "$GITHUB_OUTPUT"
+
+      # the verify build, with no token yet: what the publish uploads, packaged and built (its
+      # `publish = false` members left out, which `cargo package --workspace` would take)
+      - name: cargo publish --dry-run
+        if: steps.crates.outputs.remaining != '0'
+        env:
+          EXCLUDE: ${{ steps.crates.outputs.exclude }}
+        run: |
+          set -euo pipefail
+          read -r -a exclude <<< "$EXCLUDE"
+          cargo publish --workspace --locked --dry-run "${exclude[@]}"
+
+      # minted even when nothing remains (the re-run after a first version published by hand), so
+      # a Trusted Publishing not set, or naming another workflow or environment, fails there and
+      # not at the next release. crates.io mints it if any crate of the repository trusts this
+      # workflow, so a crate it misses still fails at its upload. Revoked when the job ends.
+      - name: crates.io's token (Trusted Publishing)
+        id: auth
+        if: steps.crates.outputs.packages != '0'
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+
+      # packaged again, not built again (`--no-verify`): the dry run's build stands
+      - name: cargo publish
+        if: steps.crates.outputs.remaining != '0'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          EXCLUDE: ${{ steps.crates.outputs.exclude }}
+        run: |
+          set -euo pipefail
+          read -r -a exclude <<< "$EXCLUDE"
+          cargo publish --workspace --locked --no-verify "${exclude[@]}"

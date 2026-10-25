@@ -1,0 +1,6 @@
+#!/bin/sh
+# What fails fastest, so a commit stays quick: the Typst code's format, the shell, the workflows,
+# the imports' versions, dprint; the tests, the bundle's lint and the rest are `just checks` and
+# CI. Checks the working tree, not just what is staged.
+set -eu
+just format-check shell-check actionlint versions-check dprint-check

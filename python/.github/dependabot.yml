@@ -1,0 +1,60 @@
+# GitHub Actions, pinned to commits, each release in a comment, and Dependabot moves both
+# (docs.github.com, "Dependabot supported ecosystems"); and the flake's inputs, monthly. No uv
+# entry: every pin in pyproject.toml's dependency groups is the flake's nixpkgs' version, so uv's
+# verdict is Nix's -- the pins follow nixpkgs (on the nix pull request, or after `nix flake
+# update`, the `pins` check names each to move, and `just pins-update` moves them, the lock with
+# them), and security.yml audits the lock daily. Add a uv entry, with the dev group ignored, once
+# the packages have dependencies of their own.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    # `ci(deps): ...` -- nothing a user of the package meets, so no changelog entry
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels: # each created once (Issues > Labels): one the repository lacks is ignored
+      - "dependencies"
+      - "actions"
+    groups:
+      # minor and patch updates in one pull request (dependabot-automerge.yml merges it once the
+      # checks pass); a major one alone, for review
+      actions-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    cooldown:
+      default-days: 3 # Dependabot's default too (its options reference), set explicitly
+
+  # the flake's inputs, monthly, in one pull request (Dependabot's `nix` ecosystem: each input to
+  # its branch's newest commit); `just pins-update` on its branch when the `pins` check names a pin
+  # that moved. A person merges it: dependabot-automerge.yml takes patch and minor bumps alone, and
+  # a commit's move is neither. A private repository's are not moved (the `nix` ecosystem is public
+  # repositories' alone): `nix flake update` by hand there
+  - package-ecosystem: "nix"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 1
+    # `build(deps): ...` -- a changelog entry: `nix build` ships the package from the flake
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    labels: # each created once (Issues > Labels): one the repository lacks is ignored
+      - "dependencies"
+      - "nix"
+    groups:
+      # every input, whatever its move: a commit has no semver level to sort it by
+      flake-inputs:
+        patterns:
+          - "*"

@@ -1,0 +1,150 @@
+# cargo-generate (https://cargo-generate.github.io/cargo-generate/; Liquid, language-agnostic):
+# `cargo generate --git <this repository> typst`.
+#
+#   ignore  -> file is not copied into the generated project at all
+#   exclude -> file is copied, but never processed by Liquid
+#   include -> unused: it would set `exclude` aside
+
+[template]
+# 0.25 is the version this template is verified with: `ignore` below names paths as the template
+# spells them, which relies on its removing them before rendering (see the note there)
+cargo_generate_version = ">=0.25.0"
+
+# Copied verbatim, never rendered:
+#
+#   .github/workflows/*  GitHub Actions expressions; some use `||` inside an interpolation,
+#                        which is not valid Liquid and would abort generation
+#   cliff.toml           git-cliff's Tera templates. Its conditionals happen to *be* valid
+#                        Liquid, so they would be evaluated silently and the changelog gutted
+#   justfile             just's own interpolation shares Liquid's double-brace syntax
+#   flake.*, .githooks   nothing project-specific
+#   src, tests (but      Typst code: a `{{` or `{%` in it is Typst's, never Liquid's; src/lib.typ,
+#   src/lib.typ)         which picks the kind's module, is the one rendered
+#   *.png                the tests' references: binary, which cargo-generate refuses to render
+#                        ("Substitution skipped, found invalid syntax") and so aborts
+#
+# A file that fails to render is copied unrendered without a word (cargo-generate 0.25), so a
+# Liquid error shows only in dev/typst/render-check.py, which renders strictly.
+exclude = [
+    ".github/workflows/**",
+    ".githooks/**",
+    "cliff.toml",
+    "justfile",
+    "flake.nix",
+    "flake.lock",
+    "src/greet.typ",
+    "src/report.typ",
+    "tests/**",
+    "**/*.png",
+]
+
+# The project name, checked before anything is written: Typst Universe's naming rules
+# (validate-name.rhai). cargo-generate runs a hook from the template and does not copy it.
+[hooks]
+pre = ["validate-name.rhai"]
+
+[placeholders.project_kind]
+type = "string"
+prompt = "What should this be? (template = a template package: `typst init` copies its template/ into a new project)"
+choices = ["package", "template"]
+default = "package"
+
+[placeholders.author_name]
+type = "string"
+prompt = "Author name (typst.toml's authors, the licence's copyright line)"
+# it lands in a TOML string -- a `"` or `\` would end or escape it -- before `<@handle>`, which a
+# `<` or `>` would break
+regex = '^[^\s"\\<>][^"\\<>]*$'
+
+[placeholders.author_email]
+type = "string"
+prompt = "Author email (the code of conduct's contact; leave empty to omit it)"
+default = ""
+regex = '^$|^[^@\s"\\]+@[^@\s"\\]+\.[^@\s"\\]+$'
+
+[placeholders.github_username]
+type = "string"
+prompt = "GitHub user or org (the repository, typst.toml's `<@handle>`, security advisories)"
+# GitHub's rule, which Universe's bundler checks in `<@handle>`: alphanumerics and single
+# hyphens between them; its 39 characters at most are validate-name.rhai's (this counts letters)
+regex = '^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$'
+
+[placeholders.license]
+type = "string"
+prompt = "License (a template package's template/ is MIT-0 whatever this is -- see README)"
+choices = ["MIT OR Apache-2.0", "MIT", "Apache-2.0", "MIT-0"]
+default = "MIT OR Apache-2.0"
+
+[placeholders.compiler]
+type = "string"
+prompt = "Oldest Typst supported (typst.toml's `compiler`; CI compiles the README and the template on it)"
+default = "0.14.0"
+# a released Typst, from 0.12 (the oldest the CI's commands are verified on) to the flake's typst
+# (nixpkgs' at flake.lock) exactly: CI installs the floor by its version, and a floor above the
+# flake's could not be tested -- render-check holds the two together, naming the regex to write
+regex = '^0\.12\.0$|^0\.13\.[01]$|^0\.14\.[0-2]$|^0\.15\.[01]$'
+
+[placeholders.keywords]
+type = "string"
+prompt = "Search keywords, comma separated (may be empty; a template: the full name of its organisation)"
+default = ""
+regex = '^$|^[^",\\]*[^",\\\s][^",\\]*(,[^",\\]*[^",\\\s][^",\\]*)*$'
+
+[placeholders.disciplines]
+type = "string"
+prompt = "Disciplines it is for, comma separated (empty when generally applicable)"
+default = ""
+regex = '^$|^\s*(?:accounting|agriculture|anthropology|archaeology|architecture|biology|business|chemistry|communication|computer-science|design|drawing|economics|education|engineering|environment|fashion|film|finance|geography|geology|history|journalism|law|linguistics|literature|mathematics|medicine|music|painting|philosophy|photography|physics|politics|psychology|sociology|theater|theology|transportation)(?:\s*,\s*(?:accounting|agriculture|anthropology|archaeology|architecture|biology|business|chemistry|communication|computer-science|design|drawing|economics|education|engineering|environment|fashion|film|finance|geography|geology|history|journalism|law|linguistics|literature|mathematics|medicine|music|painting|philosophy|photography|physics|politics|psychology|sociology|theater|theology|transportation))*\s*$'
+
+# Universe's advice (typst/packages, docs/manifest.md): a package says what it does, in the
+# imperative; a template, the document it makes. Asked per kind, for a default of each style. It
+# lands in a TOML string: a `"` or `\` would end or escape it.
+[conditional.'project_kind == "package"'.placeholders.description]
+type = "string"
+prompt = "One-line description: what it does, imperative, 40-60 characters, no \"Typst\""
+default = "Greet anyone by name with a friendly sentence."
+regex = '^[^\s"\\][^"\\]*$'
+
+[conditional.'project_kind == "template"'.placeholders.description]
+type = "string"
+prompt = "One-line description: the document it makes, 40-60 characters, no \"Typst\" or \"template\""
+default = "Reports with a title block and numbered sections."
+regex = '^[^\s"\\][^"\\]*$'
+
+# Universe's categories (typst/packages, docs/CATEGORIES.md), at most three; a template package
+# needs one, so the two kinds ask with their own default and rule. Conditions are Rhai.
+[conditional.'project_kind == "package"'.placeholders.categories]
+type = "string"
+prompt = "Categories, comma separated, at most 3 (may be empty; e.g. components, visualization, utility)"
+default = ""
+regex = '^$|^\s*(?:components|visualization|model|layout|text|languages|scripting|integration|utility|fun|book|report|paper|thesis|poster|flyer|presentation|cv|office)(?:\s*,\s*(?:components|visualization|model|layout|text|languages|scripting|integration|utility|fun|book|report|paper|thesis|poster|flyer|presentation|cv|office)){0,2}\s*$'
+
+[conditional.'project_kind == "template"'.placeholders.categories]
+type = "string"
+prompt = "Categories, comma separated, 1 to 3 (the document it makes: report, paper, thesis, cv...)"
+default = "report"
+regex = '^\s*(?:components|visualization|model|layout|text|languages|scripting|integration|utility|fun|book|report|paper|thesis|poster|flyer|presentation|cv|office)(?:\s*,\s*(?:components|visualization|model|layout|text|languages|scripting|integration|utility|fun|book|report|paper|thesis|poster|flyer|presentation|cv|office)){0,2}\s*$'
+
+# --- conditional file selection ----------------------------------------------------------------
+#
+# NOTE: `ignore` entries are literal paths relative to the template root, NOT globs -- a glob
+# would resolve to a path that does not exist and be skipped silently; `exclude` above *is*
+# glob-based. The removal happens before expansion, on the template's own file names
+# (cargo-generate 0.25, `ignore_me::remove_unneeded_files`).
+
+# A package: no template directory, and the report's module and test are the template's.
+[conditional.'project_kind == "package"']
+ignore = ["template", "src/report.typ", "tests/report", "tests/report-input"]
+
+[conditional.'project_kind == "template"']
+ignore = ["src/greet.typ", "tests/greet", "tests/greet-input"]
+
+# LICENSE holds the licence, or for the dual licence names the two texts beside it (as Universe
+# asks: a file named LICENSE, or one the README links)
+[conditional.'license != "MIT OR Apache-2.0"']
+ignore = ["LICENSE-MIT", "LICENSE-APACHE"]
+
+# a template package's template/ is MIT-0 (typst/packages, docs/licensing.md): its own text,
+# unless MIT-0 is the whole package's, in LICENSE
+[conditional.'project_kind != "template" || license == "MIT-0"']
+ignore = ["LICENSE-MIT-0"]

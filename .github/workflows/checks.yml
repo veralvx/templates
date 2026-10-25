@@ -1,0 +1,59 @@
+# What every pull request must pass that needs no template generated and no Nix shell: the shared
+# files' copies (`just sync --check`), no tool version written by hand (`just tool-versions-check`)
+# and every template rendered for every answer combination (`just render-check`). The other checks
+# have workflows of their own: the shell and the workflows in nix.yml (the flake's checks, its
+# lock's tools), dprint and cocogitto in style-check-*, the generated projects in smoke.yml.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  # every pull request, whatever it touches: a path-filtered workflow never reports, and a
+  # required check that never reports blocks the merge
+  pull_request:
+  # weekly too: the runner moves without a commit here (its image, the Python render-check runs on)
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+# a pull request's newest run cancels its older ones; any other run, a group of its own: every
+# commit on main checked (in a shared group, a pending run gives way to the newest: the default)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # nix-instantiate: every rendered Nix file parsed; nix: rust's lock held to its MSRV prompt,
+      # typst's `compiler` prompt to its lock's Typst
+      - name: Install Nix
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+
+      # the steps below run `just checks`'s recipes of the same names: the root lock's just, the
+      # dev shell's
+      - name: Install just
+        run: dev/nix-tools.sh . just
+
+      - name: The shared files' copies
+        run: just sync --check
+
+      - name: No tool version written by hand
+        run: just tool-versions-check
+
+      # render-check skips the Nix parse, unsaid, when nix-instantiate is missing, and rust's lock
+      # check and typst's `compiler` cap, saying so, when nix is: both refused here
+      - name: Every template rendered, every answer combination
+        run: |
+          for tool in nix-instantiate nix; do
+            command -v "$tool" > /dev/null || { echo "::error::$tool is not on PATH" >&2; exit 1; }
+          done
+          just render-check

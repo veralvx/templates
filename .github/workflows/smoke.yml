@@ -1,0 +1,105 @@
+# Each template generated and put through what its projects run: smoke-<template>.yml, called here
+# for the templates a run needs (dev/changes.sh): a pull request's, by the paths it changes; every
+# one on main, weekly (a template rots without a commit: a new release upstream, a moved runner
+# image) and by hand. smoke-gate is the one required check: a skipped job reports success, so a
+# required one that never ran would pass (or, never reporting, block); the gate passes only if
+# `changes` succeeded, every job succeeded or was not needed, and every template `changes` listed
+# has its job here and among the gate's needs, succeeded.
+name: Smoke
+
+on:
+  push:
+    branches: [main]
+  # every pull request, whatever it touches: a path-filtered workflow never reports, and a
+  # required check that never reports blocks the merge
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+# a pull request's newest run cancels its older ones; any other run, a group of its own: every
+# commit on main checked (in a shared group, a pending run gives way to the newest: the default).
+# Here alone: a called workflow runs in this one's context, so the same group written there would be
+# this very group, and the runs would cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      typst: ${{ steps.changes.outputs.typst }}
+      python: ${{ steps.changes.outputs.python }}
+      rust: ${{ steps.changes.outputs.rust }}
+      needed: ${{ steps.changes.outputs.needed }}
+    steps:
+      # a pull request's merge commit and its first parent, the base branch it would land on
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: The templates this run needs
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = pull_request ]; then
+            dev/changes.sh HEAD^1 HEAD | tee -a "$GITHUB_OUTPUT"
+          else
+            dev/changes.sh | tee -a "$GITHUB_OUTPUT"
+          fi
+
+  # one job each: a reusable workflow's path takes no expression, so no matrix can name it
+  smoke-typst:
+    needs: changes
+    if: needs.changes.outputs.typst == 'true'
+    uses: ./.github/workflows/smoke-typst.yml
+
+  smoke-python:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    uses: ./.github/workflows/smoke-python.yml
+
+  smoke-rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    uses: ./.github/workflows/smoke-rust.yml
+
+  smoke-gate:
+    name: smoke-gate
+    needs: [changes, smoke-typst, smoke-python, smoke-rust]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # every job here succeeded or was skipped; and every template `changes` chose has its job
+      # here, succeeded: one without a job, or a job left out of these needs, fails the gate
+      - name: Every needed template's job succeeded, the rest skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          NEEDED: ${{ needs.changes.outputs.needed }}
+        run: |
+          set -euo pipefail
+          jq --compact-output 'map_values(.result)' <<< "$NEEDS"
+          echo "needed: $NEEDED"
+          if [ "$(jq -r '.changes.result' <<< "$NEEDS")" != success ]; then
+            echo "::error::changes did not succeed: no template's run can be judged" >&2
+            exit 1
+          fi
+          # into variables, not process substitutions: a jq that fails stops here
+          if ! jq -e 'type == "array" and all(.[]; type == "string")' <<< "$NEEDED" > /dev/null; then
+            echo "::error::changes' needed list is no JSON list of names: $NEEDED" >&2
+            exit 1
+          fi
+          wrong="$(jq -r 'to_entries[] | select(.value.result | IN("success", "skipped") | not) | "\(.key): \(.value.result)"' <<< "$NEEDS")"
+          missing="$(jq -r --argjson needed "$NEEDED" '. as $jobs | $needed[] | "smoke-\(.)" | select($jobs[.].result != "success") | "\(.): \($jobs[.].result // "no such job among smoke-gate'"'"'s needs")"' <<< "$NEEDS")"
+          if [ -n "$wrong$missing" ]; then
+            printf '%s\n' "$wrong" "$missing" | sed '/^$/d' | sort -u | sed 's/^/::error::/' >&2
+            exit 1
+          fi

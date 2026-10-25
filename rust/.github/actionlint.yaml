@@ -1,0 +1,7 @@
+# release.yml is dist's (`dist init` writes it, `dist plan` refuses another): the shellcheck notes
+# and warnings its scripts draw are dist's to fix, and an edit here would not survive the next `dist
+# init`. shellcheck's errors, and actionlint's other checks, still hold it.
+paths:
+  .github/workflows/release.yml:
+    ignore:
+      - 'shellcheck reported issue in this script: SC\d+:(info|style|warning):.+'

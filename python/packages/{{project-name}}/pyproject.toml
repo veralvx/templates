@@ -1,0 +1,75 @@
+[build-system]
+# hatchling 1.27.0: core metadata 2.4 by default, so License-Expression and License-File
+# (PEP 639) written -- 1.26.x's default, 2.3, holds neither; the flake uses nixpkgs' own
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "{{project-name}}"
+version = "0.1.0"
+description = "{{description}}"
+readme = "README.md"
+license = "{{license}}"
+{% if license == "MIT OR Apache-2.0" -%}
+license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
+{%- elsif license == "MIT" -%}
+license-files = ["LICENSE-MIT"]
+{%- else -%}
+license-files = ["LICENSE-APACHE"]
+{%- endif %}
+requires-python = ">={{python_min}}"
+# multi-line, as each array an answer fills: dprint wraps a long one-line one, its length deciding
+authors = [
+    { name = "{{author_name}}"{% if author_email != "" %}, email = "{{author_email}}"{% endif %} },
+]
+{% if keywords != "" -%}
+keywords = [
+{%- assign kw_list = keywords | split: "," %}
+{%- for k in kw_list %}
+    "{{ k | strip }}",
+{%- endfor %}
+]
+{% endif -%}
+# https://pypi.org/classifiers/ -- no License :: one: PEP 639's `license` replaces them
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+{%- if python_min <= "3.12" %}
+    "Programming Language :: Python :: 3.12",
+{%- endif %}
+{%- if python_min <= "3.13" %}
+    "Programming Language :: Python :: 3.13",
+{%- endif %}
+{%- if python_min <= "3.14" %}
+    "Programming Language :: Python :: 3.14",
+{%- endif %}
+    "Programming Language :: Python :: 3.15",
+    "Typing :: Typed",
+]
+dependencies = ["{{project-name}}-core>=0.1.0"]
+
+[project.scripts]
+{{project-name}} = "{{crate_name}}.cli:main"
+
+[project.urls]
+Changelog = "https://github.com/{{github_username}}/{{project-name}}/blob/main/packages/{{project-name}}/CHANGELOG.md"
+Homepage = "https://github.com/{{github_username}}/{{project-name}}/tree/main/packages/{{project-name}}"
+Issues = "https://github.com/{{github_username}}/{{project-name}}/issues"
+Repository = "https://github.com/{{github_username}}/{{project-name}}"
+
+# this workspace's main package: the flake's default, its image, GitHub's latest release -- the
+# one member so marked, in its own [tool] table (PEP 518: a tool.<name> is <name>'s owner's)
+[tool.{{project-name}}]
+main = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{crate_name}}"]
+
+# the library from the workspace, not PyPI -- for uv alone: `uv build --no-sources` (publish.yml)
+# builds with the requirement above, as anyone installing it from PyPI meets it
+[tool.uv.sources]
+{{project-name}}-core = { workspace = true }

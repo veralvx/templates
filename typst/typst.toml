@@ -1,0 +1,57 @@
+# The package manifest (typst/packages, docs/manifest.md). `just release` moves `version`, and every
+# `@preview/{{project-name}}:<version>` import with it.
+[package]
+name = "{{project-name}}"
+version = "0.1.0"
+entrypoint = "src/lib.typ"
+authors = ["{{author_name}} <@{{github_username}}>"]
+{%- if project_kind == "template" and license == "MIT OR Apache-2.0" %}
+# template/ is MIT-0, the rest MIT or Apache-2.0 (README.md, License)
+license = "(MIT OR Apache-2.0) AND MIT-0"
+{%- elsif project_kind == "template" and license != "MIT-0" %}
+# template/ is MIT-0, the rest {{license}} (README.md, License)
+license = "{{license}} AND MIT-0"
+{%- else %}
+license = "{{license}}"
+{%- endif %}
+description = "{{description}}"
+repository = "https://github.com/{{github_username}}/{{project-name}}"
+{%- if keywords != "" %}
+keywords = [
+{%- assign list = keywords | split: "," %}
+{%- for item in list %}
+    "{{ item | strip }}",
+{%- endfor %}
+]
+{%- endif %}
+{%- if categories != "" %}
+categories = [
+{%- assign list = categories | split: "," %}
+{%- for item in list %}
+    "{{ item | strip }}",
+{%- endfor %}
+]
+{%- endif %}
+{%- if disciplines != "" %}
+disciplines = [
+{%- assign list = disciplines | split: "," %}
+{%- for item in list %}
+    "{{ item | strip }}",
+{%- endfor %}
+]
+{%- endif %}
+# the oldest Typst the package compiles on: CI's `floor` job compiles the README{% if project_kind == "template" %} and the template{% endif %}
+# on it: a function never called there is never run
+compiler = "{{compiler}}"
+# What the bundle holds but a download need not -- images or a PDF manual the README links -- goes
+# in `exclude` (gitignore globs). What typst/packages should not get at all is .gitattributes'
+# export-ignore list.
+{%- if project_kind == "template" %}
+
+[template]
+path = "template"
+entrypoint = "main.typ"
+# rendered from a `typst init` of the bundle by `just bundle`, never committed: it is always the
+# template as initialized, and Universe leaves it out of the download
+thumbnail = "thumbnail.png"
+{%- endif %}

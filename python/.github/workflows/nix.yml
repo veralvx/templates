@@ -1,0 +1,61 @@
+# The flake's formatter (`nix fmt`), then its checks (nix/checks.nix): the tests and types on each
+# Python .python-versions lists that nixpkgs caches (nix/pythons.nix; checks.yml tests every one),
+# against the built packages; lint, the format, the shell, the workflows, dead code, the pins, the
+# command -- built on each system the flake declares: x86_64 and aarch64 Linux, Apple silicon
+# (macos-latest). A runner builds its own system's alone, so every system is also evaluated, nothing
+# built, in one job.
+name: Nix
+
+on:
+  push:
+    branches: [main]
+  # every pull request, whatever it touches: a path-filtered workflow never reports, and a
+  # required check that never reports blocks the merge
+  pull_request:
+  workflow_dispatch:
+
+# a pull request's newest run cancels its older ones; any other run, a group of its own: every
+# commit on main checked (in a shared group, a pending run gives way to the newest: the default)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  flake-check:
+    name: nix flake check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Nix
+        # flakes on, and the job's token for GitHub fetches
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+
+      # the formatter's verdict (nixfmt, shfmt, just's own) as `nix fmt` gives it: --ci formats, and
+      # fails if that changed a file, as the flake's `format` check fails
+      - name: nix fmt (check)
+        run: nix fmt -- --ci
+
+      - name: nix flake check
+        run: nix flake check --print-build-logs
+
+  evaluate:
+    name: nix flake check --all-systems (evaluation)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+
+      - name: Evaluate
+        run: nix flake check --no-build --all-systems

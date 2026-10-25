@@ -1,0 +1,5 @@
+# The templates, one folder each: `cargo generate --git <this repository> <folder>`. Named, a folder
+# is generated from its own cargo-generate.toml alone; with none named, cargo-generate offers only
+# the folders listed here (with --silent, it takes the first).
+[template]
+sub_templates = ["typst", "python", "rust"]

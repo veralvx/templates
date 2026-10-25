@@ -1,0 +1,17 @@
+# render-check's (dev/render_core.py, which each dev/<template>/render-check.py runs): `just
+# render-check` installs these, exactly, into a .venv made from this file, and CI through it --
+# python-liquid and PyYAML, and what they pull in, each pinned, installed alone (no dependency of
+# theirs unlisted), then held complete (`pip check`): a move of one that needs another fails, until
+# compiled again (`uv pip compile --universal --python-version 3.11` of the first two, their pins
+# kept), which also drops a pin no longer needed.
+python-liquid==2.3.4
+pyyaml==6.0.3
+# python-liquid's
+babel==2.18.0
+importlib-resources==7.1.0
+markupsafe==3.0.4
+python-dateutil==3.0.0
+pytz==2026.5
+# python-dateutil's
+six==1.17.0
+tzdata==2026.5

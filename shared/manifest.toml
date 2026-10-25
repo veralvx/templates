@@ -1,0 +1,35 @@
+# The files every template, or several, share: each original under shared/, and the templates it
+# is copied into ("all": every template root, a folder holding a cargo-generate.toml; else their
+# names). Change an original, then `just sync`, which writes each copy and its mode; never edit a
+# copy, as `just sync --check` (in `just checks`) fails on one missing or apart. dev/sync.py says
+# all it checks.
+#
+# [root]: shared/root/<path>, which is also the repository root's own <path>. Where a template
+#   renders it (not on its cargo-generate.toml exclude list), it holds no Liquid, or the root's copy
+#   would not be what a project gets. shared/root/ is laid out as a project's root: its .editorconfig
+#   governs it, as each copy's governs the copy.
+# [template]: shared/template/<path>, copied into the templates alone; Liquid allowed.
+# shared/recipes.just: each recipe in it, in the root justfile and every template's, in its place.
+
+[root]
+".editorconfig" = "all"
+".githooks/commit-msg" = "all"
+".githooks/pre-push" = "all"
+".github/ISSUE_TEMPLATE/documentation.md" = "all"
+".github/workflows/dependabot-automerge.yml" = "all"
+".github/workflows/style-check-cocogitto.yml" = "all"
+".github/workflows/style-check-dprint.yml" = "all"
+# publish.yml's: rust's a library's alone (its cargo-generate.toml)
+".github/release-notes.sh" = ["typst", "python", "rust"]
+"cliff.toml" = "all"
+"cog.toml" = "all"
+# the root flake's inputs are typst's (flake.nix): its shell's tools, a typst project's versions
+"flake.lock" = ["typst"]
+
+[template]
+".github/ISSUE_TEMPLATE/config.yml" = "all"
+".github/ISSUE_TEMPLATE/feature_request.md" = "all"
+"CODE_OF_CONDUCT.md" = "all"
+"LICENSE-APACHE" = "all"
+"LICENSE-MIT" = "all"
+".github/image-registries.sh" = ["python", "rust"]

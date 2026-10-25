@@ -1,0 +1,225 @@
+# Contributing to `{{project-name}}`
+
+Thank you for considering contributing to `{{project-name}}`!
+
+A project just generated from its template: start at [First steps](#first-steps), under
+Maintainers.
+
+## Prerequisites
+
+Either **Nix** -- `nix develop` gives every tool below at the versions `flake.lock` pins, uv on
+nixpkgs' Python {{python_min}} (its own downloads off) -- or, installed yourself:
+
+- **[uv](https://docs.astral.sh/uv/) 0.13.0**, exactly: `pyproject.toml`'s `required-version`,
+  which writes and checks the lock. `uv sync --locked` then installs the dev group -- ruff,
+  basedpyright, ty, vulture, pytest and its plugins -- at the pinned versions.
+- **[just](https://github.com/casey/just)** -- the command runner the automation is written in.
+- **[ShellCheck](https://www.shellcheck.net/)**, **[shfmt](https://github.com/mvdan/sh)** and
+  **[jq](https://jqlang.org/)** -- the shell's linter and formatter (its style is
+  `.editorconfig`'s), and what `just shell-check` reads the justfile's recipes with.
+- **[actionlint](https://github.com/rhysd/actionlint)** -- lints the workflows (and, through
+  ShellCheck, their `run:` scripts).
+- **[dprint](https://dprint.dev/)** -- formats the Markdown and TOML.
+- **[cocogitto](https://docs.cog.tools/)** (`cog`) -- enforces Conventional Commits.
+- **[Nix](https://nixos.org)** for the last of `just checks`, the flake's checks (`just nix`):
+  without it, `just checks` stops there, every other check passed.
+
+pip-audit and git-cliff need no install: `just audit` and `just changelog` run them from their
+own dependency groups, through uv.
+
+On NixOS, the wheels' executables (ruff, ty, git-cliff, basedpyright's node) need a standard
+dynamic loader: `programs.nix-ld.enable = true;`.
+
+## Setup
+
+1. Fork this repository and create your branch from `main`.
+2. Clone your fork, and install the environment:
+
+```sh
+git clone https://github.com/<you>/{{project-name}} && cd {{project-name}}
+uv sync --locked
+```
+
+3. Optionally, `just install-hooks`: `.githooks/` then checks the lock, ruff, the shell, the
+   workflows and dprint before each commit, the message as a Conventional Commit, and every pushed
+   commit's message before a push -- what CI would refuse, minutes earlier. They need `just`,
+   `uv`, `shellcheck`, `shfmt`, `jq`, `actionlint`, `dprint` and `cog` on `PATH` (inside
+   `nix develop`, with Nix); `git config --unset core.hooksPath` turns them off.
+
+## Guidelines
+
+Before you start, read [AGENTS.md](AGENTS.md). It documents the lint and type policy -- which
+rules are on, why, and what to do when one fires -- and applies to human and AI-assisted
+contributions alike.
+
+## Testing Strategy
+
+- **Pure functions:** isolate logic from side effects wherever possible and cover it with unit
+  tests.
+- **Regressions:** if you are fixing a bug, include a test that reproduces the previous failure
+  state.
+- **Coverage:** every line and branch (`fail_under = 100`). Code a test cannot reach is
+  questioned before it is excluded.
+{%- if project_kind == "workspace" %}
+- **Where logic goes:** in `packages/{{project-name}}-core`, not in the command line, which
+  parses arguments and prints.
+{%- endif %}
+- **The tests import the package as installed** (pytest's `--import-mode=importlib`): the editable
+  install here, the built one in the flake's checks -- so a file missing from the wheel fails
+  there.
+- **Property tests** (Hypothesis), if you add them: `uv add --dev 'hypothesis==<version>'`, at
+  the flake's nixpkgs' version, and a `conftest.py` at the repository's root -- every run loads
+  it; add it to `[tool.basedpyright]`'s `include` -- loading Hypothesis's own `ci` profile:
+
+  ```python
+  """Hypothesis's `ci` profile in every run, the Nix sandbox's included."""
+
+  from hypothesis import settings
+
+  settings.load_profile("ci")
+  ```
+
+  It draws the same examples each run, with no example database and no deadline; Hypothesis
+  loads it by itself only under a CI's variable (`CI`, `GITHUB_ACTIONS`...), so the flake and a
+  local run would draw anew.
+
+## Development Workflow
+
+1. The [Conventional Commits](https://www.conventionalcommits.org/) specification is enforced on
+   every commit. A commit's subject is its changelog entry -- git-cliff writes the changelog from
+   them at each release -- so write it for the package's users.
+2. Run the checks. The `justfile` runs the workflows' commands:
+
+```sh
+just checks   # the lock, ruff, the shell, the workflows, types, dead code, tests, dprint, cog, pip-audit, nix
+just nix      # `nix fmt -- --ci`, then the flake's checks, as nix.yml: git's files only
+just format   # ruff (imports, format), shfmt, the justfile and dprint in place, then `nix fmt`
+just build    # every package's sdist and wheel, into dist/
+```
+
+`just` alone lists every recipe.
+
+A new dependency: `uv add` it. The flake builds with nixpkgs' package of the same name; `just nix`
+names one it cannot map -- another name in nixpkgs, extras, a marker -- to give in
+`nix/packages.nix`'s `overrides`. A new dev tool: `uv add --dev 'name==<version>'`, the flake's
+nixpkgs' version (its `pins` check holds it); a Python package there -- a pytest plugin, say --
+joins the flake's test environment too.
+
+## Creating a Pull Request
+
+1. Make sure `just checks` passes.
+2. Open a pull request against `main`, titled as a conventional commit: a squash merge makes the
+   title its commit, and so a changelog entry (CI checks it). Describe the problem it solves, and
+   link its issue (`Fixes #123`), if any.
+3. Wait for a maintainer's review.
+
+## Maintainers
+
+### First steps
+
+The lock is yours to write, from this machine's uv, and then the first commit -- which `cog check`
+(run by `just checks` and by CI) requires to follow
+[Conventional Commits](https://www.conventionalcommits.org/). `cargo-generate` made the git
+repository; nixpkgs' build of it makes none, so `git init -b main` first if `.git` is missing:
+
+```sh
+uv lock
+git add .
+git commit -m "chore: initial commit from template"
+```
+
+With [Nix](https://nixos.org), `nix develop` enters a shell with uv, its Python and every tool
+above, at the versions `flake.lock` pins -- the same as the dev group's (`pyproject.toml`). A
+flake sees git's files only, so add them before the lock: `git add .`, `nix develop --command uv
+lock`, then the block above from its `git add .`.
+
+Then, in whichever order suits you:
+
+- Push to `https://github.com/{{github_username}}/{{project-name}}`.
+- Enable the repository settings the auto-merge workflow needs -- they are listed at the top of
+  `.github/workflows/dependabot-automerge.yml`. Without required status checks, it merges bumps
+  that CI never gated.
+- Enable private vulnerability reporting (Settings → Code security): it is off by default, and
+  [SECURITY.md](SECURITY.md) and the issue form point to it.
+- Add a pending publisher on [PyPI](https://pypi.org/manage/account/publishing/) for
+  {% if project_kind == "workspace" %}each package, `{{project-name}}` and `{{project-name}}-core`{% else %}the package, `{{project-name}}`{% endif %}:
+  this repository, the workflow `publish.yml`, the environment `pypi`. A release tag then
+  publishes without a stored token, and its GitHub release follows PyPI's: without the publisher,
+  neither is made.
+- If you limit the `pypi` environment's deployments (Settings → Environments), admit the release
+  tags, each a rule of ref type Tag -- {% if project_kind == "workspace" %}`{{project-name}}-v*`
+  and `{{project-name}}-core-v*`{% else %}`v*`{% endif %}: the PyPI job runs on the tag, and an
+  environment that refuses it publishes nothing.
+{%- if project_kind != "lib" and container_image %}
+- After the first release, make the image public: GHCR publishes a new package as private (its
+  page, Package settings → Change visibility).
+- To publish the image to Docker Hub too: create its repository there, then set the repository
+  variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (an access token that writes)
+  -- and the variable `DOCKERHUB_REPOSITORY` (`namespace/name`) unless it is
+  `<username>/<this repository's name>`. A Docker Hub failure holds the GHCR release back too.
+{%- endif %}
+- Run `just checks` once to confirm your tools are complete: a step that stops on a missing
+  command names it ([Prerequisites](#prerequisites) lists them; `nix develop` has them all).
+- `just install-hooks`, if you want git to run the quick checks before each commit and push
+  ([Setup](#setup)).
+- Read [AGENTS.md](AGENTS.md) before writing code: every ruff rule is on, and basedpyright runs
+  in its strictest mode.
+- Make the project yours: the code, the tests, {% if project_kind == "workspace" %}each member's README (its package's page on PyPI)
+  and the description and keywords in its `pyproject.toml`{% else %}the README (the package's page on PyPI) and the
+  description and keywords in `pyproject.toml`{% endif %}.
+
+### Releasing
+
+{% if project_kind == "workspace" -%}
+Each package is released on its own, from a clean `main` equal to `origin/main`, CI green on it:
+
+```sh
+just changelog <package> --unreleased   # the section the release will write
+just release <package> <major|minor|patch>
+```
+
+The tag is `<package>-v<version>`. Release `{{project-name}}-core` first when `{{project-name}}`
+needs its new version, and raise `{{project-name}}`'s requirement on it to that version: uv and the
+flake build against the workspace's copy, so nothing here sees a stale floor -- PyPI's users would.
+The release holds to this, along the whole chain a member needs: it refuses a member it needs,
+directly or through another, whose `src` or installed fields (dependencies, scripts...) changed
+since its tag, or whose release is not yet on PyPI (its `publish.yml` run failed, or every file
+yanked); a requirement between them that excludes or sits below the release it names; and a
+library's version a dependent's range excludes. It asks PyPI's Simple API; `RELEASE_INDEX_URL` names
+another index.
+{%- else -%}
+From a clean `main` equal to `origin/main`, CI green on it:
+
+```sh
+just changelog --unreleased   # the section the release will write
+just release <major|minor|patch>
+```
+
+The tag is `v<version>`.
+{%- endif %}
+
+The recipe shows every step, in order, and runs no tests -- CI's verdict on that commit is the
+release's: it refuses a release with nothing in it, sets the version (`uv version --bump`, the lock
+with it), writes the changelog (git-cliff), commits, tags, and pushes the commit and the tag
+together. The first release is the version `pyproject.toml` declares, whatever the level. The tag
+runs `publish.yml`: the package built once, published to PyPI by Trusted Publishing, then its GitHub
+release of the same files, its notes the changelog's new section (a dev or pre-release version, a
+GitHub pre-release)
+{%- if project_kind != "lib" and container_image %};
+{% if project_kind == "workspace" %}the main package's, {% endif %}`image.yml` too (its OCI image to GHCR, from the flake's `image`: `nix build
+.#image` builds it here){% endif %}.
+
+- The commits since the last tag must hold a change a user meets (`feat`, `fix`, `perf`,
+  `build`...): `chore`, `ci` and `style` alone make no release.
+- The release pushes to `main` directly: with "Require a pull request before merging" on, the
+  maintainer cutting it needs the rule's bypass. A refused push leaves the commit and the tag
+  local -- push them again with `git push --atomic origin main <tag>` once allowed.
+
+## Updating the tools
+
+The dependency groups' pins are the flake's nixpkgs' versions, so a tool moves with nixpkgs.
+Dependabot moves the flake's inputs in a monthly pull request; when its `pins` check fails, naming
+each pin to move, run `just pins-update` on that branch (`nix develop --command just
+pins-update`): it moves the pins and uv's `required-version`, then writes the lock. By hand, the
+same: `nix flake update`, `just pins-update`, then `just checks`. A new ruff or basedpyright brings
+new rules; read them before silencing any.
