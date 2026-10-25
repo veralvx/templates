@@ -10,7 +10,7 @@ Maintainers.
 Either **Nix** -- `nix develop` gives every tool below at the versions `flake.lock` pins, uv on
 nixpkgs' Python {{python_min}} (its own downloads off) -- or, installed yourself:
 
-- **[uv](https://docs.astral.sh/uv/**: `pyproject.toml`'s `required-version`,
+- **[uv](https://docs.astral.sh/uv/)**: `pyproject.toml`'s `required-version`,
   which writes and checks the lock. `uv sync --locked` then installs the dev group -- ruff,
   basedpyright, ty, vulture, pytest and its plugins -- at the pinned versions.
 - **[just](https://github.com/casey/just)** -- the command runner the automation is written in.
