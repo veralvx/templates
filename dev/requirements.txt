@@ -4,7 +4,7 @@
 # theirs unlisted), then held complete (`pip check`): a move of one that needs another fails, until
 # compiled again (`uv pip compile --universal --python-version 3.11` of the first two, their pins
 # kept), which also drops a pin no longer needed.
-python-liquid==2.3.4
+python-liquid==2.3.5
 pyyaml==6.0.3
 # python-liquid's
 babel==2.18.0
