@@ -86,7 +86,7 @@ include = ["/src", "/tests", "/CHANGELOG.md"]
 # new stub disagrees with Nix's verdict on the same code.
 dev = [
     "basedpyright==1.39.8",
-    "coverage==7.16.2", # pytest-cov's, else floating: the coverage gate is its verdict
+    "coverage==7.17.0", # pytest-cov's, else floating: the coverage gate is its verdict
 {%- if project_kind == "workspace" %}
     "packaging==26.3", # tests/test_workspace.py reads the members' requirements with it
 {%- endif %}
@@ -113,7 +113,7 @@ release = [
 [tool.uv]
 # uv too is nixpkgs' (the `pins` check): its resolver writes and checks the lock, and setup-uv
 # installs this one in the workflows (its README: `required-version`, else the latest)
-required-version = "==0.13.4"
+required-version = "==0.13.5"
 {%- if project_kind == "workspace" %}
 
 [tool.uv.workspace]
