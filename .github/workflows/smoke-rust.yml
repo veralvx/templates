@@ -60,7 +60,7 @@ jobs:
         run: dev/install-cargo-generate.sh
 
       - name: Install Nix
-        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
 
       # the template's lock's, as a generated project's dev shell has it
       - name: Install dprint
@@ -174,7 +174,7 @@ jobs:
         run: dev/install-cargo-generate.sh
 
       - name: Install Nix
-        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
 
       # the project's recipes outside its dev shell, with that shell's tools: the
       # template's lock's versions -- the hooks' just, dprint, shellcheck, shfmt,
@@ -318,7 +318,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Nix
-        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
 
       # the newest cargo-generate the template meets: its lock's (the floor
       # generates the other jobs' projects)

@@ -36,7 +36,7 @@ jobs:
       # nix-instantiate: every rendered Nix file parsed; nix: rust's lock held to its MSRV prompt,
       # typst's `compiler` prompt to its lock's Typst
       - name: Install Nix
-        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
 
       # the steps below run `just checks`'s recipes of the same names: the root lock's just, the
       # dev shell's
