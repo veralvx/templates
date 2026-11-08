@@ -226,7 +226,7 @@ jobs:
           git config --unset user.email
           refused env GIT_AUTHOR_EMAIL=smoke@example.com GIT_COMMITTER_EMAIL=smoke@example.com \
             git commit --quiet --allow-empty -m "feat: no email in git's config" 2> refusal
-          grep -q "^commit-msg: cog verify needs git's user.name and user.email" refusal
+          grep -q "^commit-msg: cog verify needs user.name and user.email in git's config files" refusal
           rm refusal
           git config user.email smoke@example.com
           # pre-push: a revert, which git commits without running commit-msg
