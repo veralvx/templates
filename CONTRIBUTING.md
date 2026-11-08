@@ -143,8 +143,8 @@ tags `v<version>` and pushes the commit and the tag together. The first release 
 whatever the level. The tag runs `release.yml`: the GitHub release, the changelog's new section as
 its notes, every tracked file as a tarball (`cargo generate --path <unpacked> <template>`).
 
-- The commits since the last tag must hold a change a user meets (`feat`, `fix`, `perf`,
-  `build`...): `chore`, `ci` and `style` alone make no release.
+- The commits since the last tag must hold one the changelog lists: any but a merge, a fixup and the
+  release commit itself.
 - The release pushes to `main` directly: with "Require a pull request before merging" on, the
   maintainer cutting it needs the rule's bypass. A refused push leaves the commit and the tag
   local -- push them again with `git push --atomic origin main v<version>` once allowed.

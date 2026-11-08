@@ -10,8 +10,12 @@ while read -r line; do
   line="${line% *}"
   local_oid="${line##* }"
   case "$local_oid" in
-    # `..<commit>`: all its history, as `cog check` reads HEAD's
-    *[!0]*) cog check "..$(git rev-parse "$local_oid^{commit}")" ;;
+    *[!0]*)
+      # a tag of a tree or a blob pushes no commit
+      commit="$(git rev-parse -q --verify "$local_oid^{commit}" 2> /dev/null)" || continue
+      # `..<commit>`: all its history, as `cog check` reads HEAD's
+      cog check "..$commit"
+      ;;
     *) ;; # a deletion: nothing is pushed
   esac
 done

@@ -185,6 +185,7 @@ flake.nix, nix/       the dev shell, `nix fmt`, the packages, the checks, the im
                       (actionlint, zizmor), dprint before a commit; Conventional Commits for the
                       message and the push
 .editorconfig         shfmt's style, for the shell scripts and the git hooks
+.gitattributes        every text file LF, a Windows checkout's too
 cliff.toml, cog.toml  git-cliff changelogs, cocogitto's commit checks
 dprint.json           Markdown and TOML formatting, its plugins pinned (`just dprint-update`)
 lychee.toml           the link check's settings (`just links`): the project's own pages left out

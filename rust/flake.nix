@@ -65,6 +65,7 @@
           lib.fileset.unions (
             map lib.fileset.maybeMissing [
               ./.cargo/mutants.toml
+              ./.gitattributes
               ./.githooks
               ./.github
               ./.gitignore

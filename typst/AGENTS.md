@@ -75,10 +75,11 @@ that is noise, and it goes stale. A change that falsifies a comment rewrites it.
 
 ## 6. Commits
 
-[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally
-and in CI. The changelog is generated from the commits (`cliff.toml`), so the subject line is
-user-facing text; `chore`, `ci` and `style` commits stay out of it, and `!` or a
-`BREAKING CHANGE` footer lists a commit first:
+[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally and
+in CI. The changelog is generated from the commits (`cliff.toml`), so the subject line is
+user-facing text; every commit enters it, by type -- `chore` and `ci` under Miscellaneous Tasks,
+`style` under Styling; merges, fixups and the release commit aside -- and `!` or a `BREAKING CHANGE`
+footer lists a commit first:
 
 ```text
 {% if project_kind == "template" -%}

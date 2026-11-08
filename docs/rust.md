@@ -221,7 +221,8 @@ rust-toolchain.toml   pinned to the MSRV
 rustfmt.toml          edition 2024, 100 columns
 dprint.json           Markdown + TOML formatting, its plugins pinned
                       (`just dprint-update`)
-cliff.toml            git-cliff changelog generation, grouped by commit type
+cliff.toml            git-cliff changelog generation, grouped by commit type,
+                      each entry linking its commit
 cog.toml              cocogitto / Conventional Commits
 dist-workspace.toml   cargo-dist config (binaries only)
 justfile              `just checks` = the checks CI runs, the flake's last;
@@ -236,6 +237,7 @@ flake.nix             Nix: the pinned toolchain and every tool, `nix fmt`, the
 flake.lock            nixpkgs and rust-overlay, those the template's smoke test
                       runs on
 .editorconfig         shfmt's style, for the shell scripts and the git hooks
+.gitattributes        every text file LF, a Windows checkout's too
 .cargo/config.toml    Miri flags
 .cargo/mutants.toml   the mutants `just mutants` skips, each with its reason
 lychee.toml           the link check's settings (`just links`): the
@@ -329,17 +331,17 @@ with `#[expect(lint, reason = "...")]`.
   it; by hand on a branch, a rehearsal that pushes nothing.
 
 Every action is pinned to a commit, its version in a comment; Dependabot moves
-them. Its Cargo bumps are `build(deps)` commits, which enter the changelog, and
-its action bumps `ci(deps)`, which do not; the flake's inputs move monthly, in
-one pull request -- `build(deps)` where `nix build` ships the binary, a
-library's `chore(deps)`, merged by a person (a commit's move is no patch or
-minor bump). The toolchain is the MSRV's: a `1.<minor>` one moves to
+them. Its Cargo bumps are `build(deps)` commits, the changelog's Build, and its
+action bumps `ci(deps)`, its Miscellaneous Tasks; the flake's inputs move
+monthly, in one pull request -- `build(deps)` where `nix build` ships the
+binary, a library's `chore(deps)`, merged by a person (a commit's move is no
+patch or minor bump). The toolchain is the MSRV's: a `1.<minor>` one moves to
 rust-overlay's newest patch of it (`1.<minor>.<patch>` stays), the miri shell's
-nightly to its newest. dist follows, where it is used: the flake's `pins`
-check fails once the dev shell's moved, and `just pins-update` on the branch
-moves `cargo-dist-version` and `release.yml` to it (`dist init`, then `just
-fmt`). In this repository, Dependabot moves every template's workflows with
-the repository's own, in one pull request
+nightly to its newest. dist follows, where it is used: the flake's `pins` check
+fails once the dev shell's moved, and `just pins-update` on the branch moves
+`cargo-dist-version` and `release.yml` to it (`dist init`, then `just fmt`). In
+this repository, Dependabot moves every template's workflows with the
+repository's own, in one pull request
 ([.github/dependabot.yml](../.github/dependabot.yml)).
 
 ### The changelog and `just release`

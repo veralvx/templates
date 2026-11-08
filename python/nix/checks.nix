@@ -17,6 +17,7 @@ let
     fileset = lib.fileset.difference ../. (
       lib.fileset.unions (
         map lib.fileset.maybeMissing [
+          ../.gitattributes
           ../.github
           ../.githooks
           ../.gitignore

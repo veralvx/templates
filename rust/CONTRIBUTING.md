@@ -255,8 +255,8 @@ Before the first one:
 - dist's `release.yml` committed ([First steps](#first-steps)): the release
   refuses to start without it, as it builds what `cargo binstall` fetches.
 {%- endif %}
-- The commits since the last tag must hold a change a user meets (`feat`,
-  `fix`, `perf`, `build`...): `chore`, `ci` and `style` alone make no release.
+- The commits since the last tag must hold one the changelog lists: any but a
+  merge, a fixup and the release commit itself.
 - The release pushes to `main` directly: with "Require a pull request before
   merging" on, the maintainer cutting it needs the rule's bypass. A refused
   push leaves the commit and the tag local -- push them again with

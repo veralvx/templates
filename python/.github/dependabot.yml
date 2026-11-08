@@ -15,7 +15,7 @@ updates:
       time: "07:00"
       timezone: "UTC"
     open-pull-requests-limit: 5
-    # `ci(deps): ...` -- nothing a user of the package meets, so no changelog entry
+    # `ci(deps): ...` -- nothing a user of the package meets: the changelog's Miscellaneous Tasks
     commit-message:
       prefix: "ci"
       include: "scope"

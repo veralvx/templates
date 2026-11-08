@@ -127,7 +127,8 @@ def export_ignore(check: Check) -> None:
     """.gitattributes' export-ignore paths exist (a stale one is dead weight), none the package."""
     print("== export-ignore paths")
     for line in check.texts[".gitattributes"].splitlines():
-        if not line.strip() or line.startswith("#"):
+        # the line ends every repository's is (shared/root/.gitattributes)
+        if not line.strip() or line.startswith("#") or line == "* text=auto eol=lf":
             continue
         path, *attributes = line.split()
         if attributes != ["export-ignore"] or not path.startswith("/"):

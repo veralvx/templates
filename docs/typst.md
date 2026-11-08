@@ -158,7 +158,8 @@ src/greet.typ         the starter code (a template package's: src/report.typ, te
 tests/                tytanic's: a visual test (its reference in ref/), an assertion test
 README.md             the package's page on Universe: its examples compile, against the bundle
 justfile              `just checks` = what CI runs; `just format`, `just bundle`, `just release`...
-.gitattributes        what typst/packages does not get (export-ignore): the bundle is git archive
+.gitattributes        every text file LF; what typst/packages does not get (export-ignore): the
+                      bundle is git archive
 .editorconfig         shfmt's style, for the shell scripts and the git hooks
 flake.nix, flake.lock the tools (the dev shell's, CI's), `nix fmt` and the checks; the lock pins
                       nixos-unstable, every tool's version with it

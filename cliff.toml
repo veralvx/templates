@@ -1,10 +1,9 @@
 # git-cliff: CHANGELOG.md from the Conventional Commits, written by `just release` (never by
-# hand). Grouped by commit type, breaking changes first; what changes nothing a user meets
-# (chores, CI, formatting, the release commit itself) is left out.
+# hand): every one, by type, breaking changes first; merges, fixups and the release commit aside.
 #
-# It names no project: `just changelog` passes the repository the headings' compare links need
-# (`--github-repo`) and, for a workspace's package, its folder and tags. Run bare, the headings
-# carry no link.
+# It names no project: `just changelog` passes the repository the links need (`--github-repo`)
+# and, for a workspace's package, its folder and tags. Run bare, it takes the current branch's
+# upstream remote where that is GitHub's, and writes no link otherwise.
 
 [changelog]
 header = """
@@ -41,8 +40,11 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim }}
     {% for commit in commits %}
+        {# the description as its author wrote it: a name keeps its case (dprint, v0.1.0) -#}
+        {% set short = commit.id | truncate(length=7, end="") -%}
         - {% if commit.scope %}{{ commit.scope }}: {% endif %}\
-          {{ commit.message | split(pat="\n") | first | upper_first | trim }}\
+          {{ commit.message | split(pat="\n") | first | trim }} \
+          ({% if url %}[{{ short }}]({{ url }}/commit/{{ commit.id }}){% else %}{{ short }}{% endif %})\
     {% endfor %}
 {% endfor %}\n
 """
@@ -50,24 +52,43 @@ trim = true
 
 [git]
 conventional_commits = true
-# what cog lets through unconventional -- merges, fixups (cog.toml) -- skipped below
-filter_unconventional = false
+commit_preprocessors = [
+    # a body right under its subject, which cog takes, set apart as git-cliff's parser needs it:
+    # its footers (BREAKING CHANGE) read
+    { pattern = '\A([^\n]*)\n([^\n])', replace = "${1}\n\n${2}" },
+    # GitHub's markers that skip a commit's workflows, at a line's end: no changelog text
+    { pattern = '(?m)( *\[(skip ci|ci skip|no ci|skip actions|actions skip)\])+ *$', replace = "" },
+]
+# every commit to the parsers, then an unconventional one they keep fails the changelog: cog lets
+# through merges and fixups alone, which they skip (one that got past cog anyway: its SHA in a
+# .cliffignore, which git-cliff skips). Filtered before the parsers instead, a merge warns as a
+# parse error
+require_conventional = true
 protect_breaking_commits = true # a breaking change is listed whatever its type, first
-# by type, the HTML comments ordering the groups
+# every conventional commit, by type, in any case (cog takes `Feat:`); the HTML comments order the
+# groups, two digits as they sort as text
 commit_parsers = [
-    { message = "^(Merge |fixup! |squash! |amend! )", skip = true },
-    { message = "^[a-z]+(\\([^)]*\\))?!:", group = "<!-- 0 -->Breaking changes" },
-    { footer = "^BREAKING[ -]CHANGE", group = "<!-- 0 -->Breaking changes" },
-    { message = "^(chore|ci|style)", skip = true },
-    { message = "^feat", group = "<!-- 1 -->Features" },
-    { message = "^fix", group = "<!-- 2 -->Fixes" },
-    { message = "^perf", group = "<!-- 3 -->Performance" },
-    { message = "^refactor", group = "<!-- 4 -->Refactoring" },
-    { message = "^build", group = "<!-- 5 -->Build" },
-    { message = "^doc", group = "<!-- 6 -->Documentation" },
-    { message = "^test", group = "<!-- 7 -->Tests" },
-    { message = "^revert", group = "<!-- 8 -->Reverts" },
-    { message = ".*", group = "<!-- 9 -->Other" },
+    # a merge, whatever its message: cog checks none (ignore_merge_commits)
+    { field = "merge_commit", pattern = "true", skip = true },
+    # what else cog lets through unconventional (ignore_fixup_commits)
+    { message = "^(fixup|squash|amend)!", skip = true },
+    # the release commit (`just release`'s), tagged: in its own section, which a later release
+    # would rewrite once published
+    { message = "^chore\\(release\\): ", skip = true },
+    { message = "^[a-zA-Z]+(\\([^)]*\\))?!:", group = "<!-- 00 -->Breaking changes" },
+    { footer = "^BREAKING[ -]CHANGE", group = "<!-- 00 -->Breaking changes" },
+    { message = "(?i)^feat", group = "<!-- 01 -->Features" },
+    { message = "(?i)^fix", group = "<!-- 02 -->Fixes" },
+    { message = "(?i)^perf", group = "<!-- 03 -->Performance" },
+    { message = "(?i)^refactor", group = "<!-- 04 -->Refactoring" },
+    { message = "(?i)^build", group = "<!-- 05 -->Build" },
+    { message = "(?i)^doc", group = "<!-- 06 -->Documentation" },
+    { message = "(?i)^test", group = "<!-- 07 -->Tests" },
+    { message = "(?i)^revert", group = "<!-- 08 -->Reverts" },
+    { message = "(?i)^style", group = "<!-- 09 -->Styling" },
+    { message = "(?i)^(chore|ci)", group = "<!-- 10 -->Miscellaneous Tasks" },
+    # any other type cog takes
+    { message = ".*", group = "<!-- 11 -->Other" },
 ]
 sort_commits = "oldest"
 # the release tags, `v0.1.0` on, the first included (python's recipes pass their own pattern: a

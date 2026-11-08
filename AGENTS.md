@@ -75,12 +75,13 @@ that is noise, and it goes stale. A change that falsifies a comment rewrites it.
 
 ## 6. Commits
 
-[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally
-and in CI. The changelog is generated from the commits (`cliff.toml`), each entry showing its
-scope, so the subject line is what a template user reads; `chore`, `ci` and `style` commits stay
-out of it, and `!` or a `BREAKING CHANGE` footer -- a prompt renamed, a file a generated project no
-longer has -- lists a commit first. A template's commit takes its name as scope; one touching
-several names each; `shared` and `dev` are the shared files' and the tooling's:
+[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally and
+in CI. The changelog is generated from the commits (`cliff.toml`), each entry showing its scope, so
+the subject line is what a template user reads; every commit enters it, by type -- `chore` and `ci`
+under Miscellaneous Tasks, `style` under Styling; merges, fixups and the release commit aside -- and
+`!` or a `BREAKING CHANGE` footer -- a prompt renamed, a file a generated project no longer has --
+lists a commit first. A template's commit takes its name as scope; one touching several names each;
+`shared` and `dev` are the shared files' and the tooling's:
 
 ```text
 feat(typst): ask for the package's disciplines
