@@ -1,9 +1,10 @@
 # The flake's checks. On each Python .python-versions lists that nixpkgs caches (pythons.nix's
 # `checked`): the tests (pytest over the built packages, as installed), the types (basedpyright);
 # once, interpreter-free: ruff, the format (`nix fmt`'s verdict: nixfmt, shfmt, just's own), the
-# shell (`just shell-check`), the workflows (actionlint), dead code; the dependency groups' pins
-# held to this nixpkgs; and the command, run through its wrapper alone. Nothing project-specific:
-# read from the pyproject files.
+# shell (`just shell-check`), the workflows (actionlint, zizmor), the local links (lychee), dead
+# code, CITATION.cff where there is one (its schema); the dependency groups' pins held to this
+# nixpkgs; and the command, run through its wrapper alone. Nothing project-specific: read from the
+# pyproject files.
 { pkgs }:
 let
   inherit (pkgs) lib;
@@ -21,6 +22,7 @@ let
           ../.gitignore
           ../AGENTS.md
           ../CHANGELOG.md
+          ../CITATION.cff
           ../CODE_OF_CONDUCT.md
           ../CONTRIBUTING.md
           ../SECURITY.md
@@ -30,12 +32,13 @@ let
           ../flake.lock
           ../flake.nix
           ../justfile
+          ../lychee.toml
           ../nix
         ]
       )
     );
   };
-  # lint's, format's, shell's and workflows': the whole repository
+  # lint's, format's, shell's, workflows' and links': the whole repository
   lintSource = lib.fileset.toSource {
     root = ../.;
     fileset = ../.;
@@ -50,6 +53,7 @@ let
       basedpyright
       ruff
       ty
+      mutmut
       pip-audit
       git-cliff
       uv
@@ -174,15 +178,17 @@ lib.foldl' (checks: version: checks // onPython version) { } pythons.checked
         touch $out
       '';
 
-  # actionlint on a copy, in a repository of its own, as `just actionlint` runs it: with no file
-  # named, actionlint finds the workflows, and .github/actionlint.yaml if there is one, from the
-  # repository's root
+  # actionlint and zizmor on a copy, in a repository of its own, as `just actionlint zizmor` runs
+  # them: with no file named, actionlint finds the workflows, and .github/actionlint.yaml if there
+  # is one, from the repository's root
   workflows =
     pkgs.runCommand "workflows"
       {
         nativeBuildInputs = [
+          pkgs.just
           pkgs.actionlint
           pkgs.shellcheck
+          pkgs.zizmor
           pkgs.gitMinimal
         ];
       }
@@ -192,7 +198,33 @@ lib.foldl' (checks: version: checks // onPython version) { } pythons.checked
         cd "$TMPDIR/project"
         export HOME="$TMPDIR"
         git init --quiet
-        actionlint
+        just actionlint zizmor
+        touch $out
+      '';
+
+  # `just links --offline` on a copy, in a repository of its own: it lists the files git does not
+  # ignore; its script recipe's bash named by its path, as shell's
+  links =
+    pkgs.runCommand "links"
+      {
+        nativeBuildInputs = [
+          pkgs.just
+          pkgs.gitMinimal
+          pkgs.lychee
+          # lychee builds its HTTP client, which loads a CA bundle, offline too
+          pkgs.cacert
+        ];
+      }
+      ''
+        cp -r ${lintSource} "$TMPDIR/project"
+        chmod -R u+w "$TMPDIR/project"
+        cd "$TMPDIR/project"
+        export HOME="$TMPDIR"
+        substituteInPlace justfile \
+          --replace-fail '#!/usr/bin/env bash' '#!${pkgs.bash}/bin/bash'
+        git init --quiet
+        git add --all
+        just links --offline
         touch $out
       '';
 
@@ -215,6 +247,13 @@ lib.foldl' (checks: version: checks // onPython version) { } pythons.checked
       vulture
       touch $out
     '';
+}
+// lib.optionalAttrs (builtins.pathExists ../CITATION.cff) {
+  # CFF's schema alone: Zenodo's import refuses more (a licence list), which its comments name
+  citation = pkgs.runCommand "citation" { nativeBuildInputs = [ pkgs.cffconvert ]; } ''
+    cffconvert --validate --infile ${../CITATION.cff}
+    touch $out
+  '';
 }
 // lib.optionalAttrs (built.default.meta ? mainProgram) {
   # the command as a user runs it: its wrapper alone gives it its environment (env -i)

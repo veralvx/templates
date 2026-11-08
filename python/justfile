@@ -49,6 +49,31 @@ vulture:
 pytest:
     uv run --locked pytest --cov -n auto
 
+# mutmut: each mutant of the code run against the tests, from every folder whose pyproject.toml
+# holds a [tool.mutmut] -- the root, or each member of a workspace (mutmut names a mutant by its
+# file's path from where it runs, its code in src/ alone). A mutant no test kills -- survived,
+# timed out, untested -- fails it: a test missing, or a change that keeps the behaviour, its line
+# marked `# pragma: no mutate` with the reason. mutmut's own exit status counts none of them:
+# `mutmut results` lists them, `mutmut show <name>` shows one.
+[doc("Mutation testing (mutmut): every mutant of the code killed by the tests")]
+mutation:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s nullglob
+    failed=0
+    for manifest in pyproject.toml packages/*/pyproject.toml; do
+        if ! grep -q '^\[tool\.mutmut\]$' "$manifest"; then continue; fi
+        folder="$(dirname "$manifest")"
+        (cd "$folder" && uv run --locked mutmut run)
+        survivors="$(cd "$folder" && uv run --locked mutmut results)"
+        if [ -n "$survivors" ]; then
+            printf '%s\n' "$survivors" >&2
+            echo "error: $folder: no test kills the mutants above: \`uv run mutmut show <name>\` there shows one" >&2
+            failed=1
+        fi
+    done
+    exit "$failed"
+
 [doc("The lock matches the pyproject files")]
 lock-check:
     uv lock --check
@@ -130,6 +155,29 @@ cog:
 [doc("The workflows linted (actionlint)")]
 actionlint:
     actionlint
+
+# zizmor, offline -- an audit that would ask GitHub is skipped, so the verdict is the same on any
+# connection -- and failing, not warning, on a file it cannot read.
+[doc("The workflows' security audited (zizmor), and Dependabot's configuration")]
+zizmor:
+    zizmor --offline --strict-collection --quiet .
+
+# lychee over the files git does not ignore but the lock -- whose archives uv holds to their hashes,
+# and fetches none until a sync -- as lychee.toml says. Online, each link fetched
+# (links.yml, monthly); `just links --offline` checks the local ones alone, `just checks`'s: the
+# same verdict on any connection. A GITHUB_TOKEN in the environment spares GitHub's rate limit.
+[doc("The links checked (lychee): just links [--offline]")]
+[positional-arguments]
+links *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # a process substitution's failure goes unseen (set -e): outside a repository, ls-files' would
+    git rev-parse --is-inside-work-tree > /dev/null
+    files=()
+    while IFS= read -r -d '' file; do
+        if [ -f "$file" ]; then files+=("$file"); fi
+    done < <(git ls-files -z --cached --others --exclude-standard -- . ':!uv.lock')
+    lychee --no-progress "$@" -- "${files[@]}"
 
 [doc("pip-audit over the lock, exported")]
 audit:
@@ -302,7 +350,7 @@ nix:
 # `nix` last: the slowest, and the one a machine without Nix cannot run -- every other has passed
 # by then. The flake sees git's files only: a new file is invisible to it until `git add`ed.
 [doc("Every check, the flake's last")]
-checks: lock-check ruff-checks shell-check actionlint static vulture pytest dprint-check cog audit nix
+checks: lock-check ruff-checks shell-check actionlint zizmor (links "--offline") static vulture pytest mutation dprint-check cog audit nix
 
 [doc("Every package's sdist and wheel into dist/, as publish.yml builds them (--no-sources)")]
 build:

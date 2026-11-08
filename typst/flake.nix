@@ -1,5 +1,5 @@
-# The package's flake: every tool whose verdict depends on its version -- typst, tytanic,
-# typstyle, tinymist, just, shellcheck, shfmt and actionlint from nixpkgs, typst-package-check
+# The package's flake: every tool whose verdict depends on its version -- typst, tytanic, typstyle,
+# tinymist, just, shellcheck, shfmt, actionlint, zizmor and lychee from nixpkgs, typst-package-check
 # from its own repository, at its tag -- the others `just checks` and `just release` run, and the
 # checks that need no network. Their versions are the ones flake.lock locks, which is why it is
 # committed: CI's are the same (`packages.tools`), and `nix flake update` (or Dependabot's) moves
@@ -14,8 +14,9 @@
 #                    that changed a file
 #   nix flake check  the format (the formatter's verdict), the lints (`just lint`: tinymist), the
 #                    shell (`just shell-check`: shellcheck and shfmt, the justfile's script recipes
-#                    too), the workflows (actionlint), the tests (tytanic) and typst-package-check
-#                    built, offline in the sandbox
+#                    too), the workflows (actionlint, zizmor), the local links (lychee), the tests
+#                    (tytanic), typst-package-check built and CITATION.cff, where there is one,
+#                    against its schema, offline in the sandbox
 {
   description = "A Typst package's development shell and checks";
 
@@ -57,7 +58,7 @@
           };
           # CI's (checks.yml's and publish.yml's, through .github/install-tools.sh), the dev shell's
           # too: jq reads typst.toml with Typst (`just manifest`), actionlint runs shellcheck on each
-          # `run:` script
+          # `run:` script; zizmor audits the workflows, lychee checks the links
           tools = [
             pkgs.typst
             pkgs.tytanic
@@ -68,6 +69,8 @@
             pkgs.shellcheck
             pkgs.shfmt
             pkgs.actionlint
+            pkgs.zizmor
+            pkgs.lychee
           ];
           # `nix fmt`: each tool on its own files -- the shell scripts by extension, the hooks by
           # their directory, as they have none; the justfile by name, as `just --fmt` takes one
@@ -174,15 +177,17 @@
                   touch $out
                 '';
 
-            # actionlint on a copy, in a repository of its own, as `just actionlint` runs it: with
-            # no file named, actionlint finds the workflows, and .github/actionlint.yaml if there is
-            # one, from the repository's root
+            # actionlint and zizmor on a copy, in a repository of its own, as `just actionlint
+            # zizmor` runs them: with no file named, actionlint finds the workflows, and
+            # .github/actionlint.yaml if there is one, from the repository's root
             workflows =
               pkgs.runCommand "workflows"
                 {
                   nativeBuildInputs = [
+                    pkgs.just
                     pkgs.actionlint
                     pkgs.shellcheck
+                    pkgs.zizmor
                     pkgs.gitMinimal
                   ];
                 }
@@ -192,7 +197,33 @@
                   cd "$TMPDIR/package"
                   export HOME="$TMPDIR"
                   git init --quiet
-                  actionlint
+                  just actionlint zizmor
+                  touch $out
+                '';
+
+            # `just links --offline` on a copy, in a repository of its own: it lists the files git
+            # does not ignore; its script recipe's bash named by its path, as above
+            links =
+              pkgs.runCommand "links"
+                {
+                  nativeBuildInputs = [
+                    pkgs.just
+                    pkgs.gitMinimal
+                    pkgs.lychee
+                    # lychee builds its HTTP client, which loads a CA bundle, offline too
+                    pkgs.cacert
+                  ];
+                }
+                ''
+                  cp -r ${./.} "$TMPDIR/package"
+                  chmod -R u+w "$TMPDIR/package"
+                  cd "$TMPDIR/package"
+                  export HOME="$TMPDIR"
+                  substituteInPlace justfile \
+                    --replace-fail '#!/usr/bin/env bash' '#!${pkgs.bash}/bin/bash'
+                  git init --quiet
+                  git add --all
+                  just links --offline
                   touch $out
                 '';
 
@@ -203,6 +234,14 @@
               cd "$TMPDIR/package"
               export HOME="$TMPDIR"
               tt run --no-fail-fast --jobs "$NIX_BUILD_CORES"
+              touch $out
+            '';
+          }
+          // lib.optionalAttrs (builtins.pathExists ./CITATION.cff) {
+            # CFF's schema alone: Zenodo's import refuses more (a licence list), which its
+            # comments name
+            citation = pkgs.runCommand "citation" { nativeBuildInputs = [ pkgs.cffconvert ]; } ''
+              cffconvert --validate --infile ${./CITATION.cff}
               touch $out
             '';
           };

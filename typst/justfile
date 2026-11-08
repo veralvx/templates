@@ -382,6 +382,28 @@ cog:
 actionlint:
     actionlint
 
+# zizmor, offline -- an audit that would ask GitHub is skipped, so the verdict is the same on any
+# connection -- and failing, not warning, on a file it cannot read.
+[doc("The workflows' security audited (zizmor), and Dependabot's configuration")]
+zizmor:
+    zizmor --offline --strict-collection --quiet .
+
+# lychee over the files git does not ignore, as lychee.toml says. Online, each link fetched
+# (links.yml, monthly); `just links --offline` checks the local ones alone, `just checks`'s: the
+# same verdict on any connection. A GITHUB_TOKEN in the environment spares GitHub's rate limit.
+[doc("The links checked (lychee): just links [--offline]")]
+[positional-arguments]
+links *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # a process substitution's failure goes unseen (set -e): outside a repository, ls-files' would
+    git rev-parse --is-inside-work-tree > /dev/null
+    files=()
+    while IFS= read -r -d '' file; do
+        if [ -f "$file" ]; then files+=("$file"); fi
+    done < <(git ls-files -z --cached --others --exclude-standard)
+    lychee --no-progress "$@" -- "${files[@]}"
+
 # shellcheck and shfmt over every shell script git does not ignore -- shfmt finds them, by extension
 # or shebang, and formats them as .editorconfig says -- and over this justfile's shell script
 # recipes (a sh, bash, dash or ksh shebang), which no file holds: each taken from `just --dump`,
@@ -542,7 +564,7 @@ nix:
 # then. The flake sees git's files only: a new file is invisible to it until `git add`ed. The
 # oldest Typst (`just floor`) is CI's.
 [doc("Every check, the flake's last")]
-checks: format-check lint shell-check actionlint test versions-check readme-check template-check package-check dprint-check cog nix
+checks: format-check lint shell-check actionlint zizmor (links "--offline") test versions-check readme-check template-check package-check dprint-check cog nix
 
 # Opt-in, as every git hook is: a clone never installs one, so CI stays the gate.
 # `git config --unset core.hooksPath` turns them off again.

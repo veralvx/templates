@@ -1,3 +1,4 @@
+import re
 import runpy
 import sys
 from importlib.metadata import version
@@ -22,6 +23,15 @@ def test_version_is_the_installed_distributions(capsys: pytest.CaptureFixture[st
         _ = main(["--version"])
     assert stop.value.code == 0
     assert capsys.readouterr().out == f"{NAME} {version(NAME)}\n"
+
+
+def test_help_says_what_it_does_and_takes(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as stop:
+        _ = main(["--help"])
+    assert stop.value.code == 0
+    lines = [line.strip() for line in capsys.readouterr().out.splitlines()]
+    assert "Print a greeting." in lines
+    assert any(re.fullmatch(r"name\s+who to greet \(default: the world\)", line) for line in lines)
 
 
 def test_python_m_runs_the_command_line(

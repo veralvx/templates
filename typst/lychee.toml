@@ -1,0 +1,12 @@
+# lychee (`just links`): the links of the files git tracks.
+
+# a link that passed, cached a day (.lycheecache, which git ignores)
+cache = true
+max_cache_age = "1d"
+# a refused connection or a 429 retried 10 s apart: a brief outage waited out
+retry_wait_time = 10
+
+exclude = [
+    # the package's own repository: none is there until it is pushed
+    '^https://github\.com/{{github_username}}/{{project-name}}([./#?]|$)',
+]

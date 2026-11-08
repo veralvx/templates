@@ -1,9 +1,10 @@
 # What `just checks` runs but the flake's (nix.yml) and the commits' and dprint's (style-check-*):
-# the format, the lints (tinymist), the shell (shellcheck, shfmt), the workflows (actionlint), the
-# tests, the imports' versions, the README's examples, a template package's template as initialized,
-# and the bundle linted as typst/packages lints it; and the README and that template again on the
-# oldest Typst typst.toml declares (`compiler`). The tools are the flake's, at the versions
-# flake.lock locks (.github/install-tools.sh), so `nix develop` and CI judge alike.
+# the format, the lints (tinymist), the shell (shellcheck, shfmt), the workflows (actionlint,
+# zizmor), the local links (lychee), the tests, the imports' versions, the README's examples, a
+# template package's template as initialized, and the bundle linted as typst/packages lints it; and
+# the README and that template again on the oldest Typst typst.toml declares (`compiler`). The tools
+# are the flake's, at the versions flake.lock locks (.github/install-tools.sh), so `nix develop` and
+# CI judge alike.
 name: Checks
 
 on:
@@ -30,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
@@ -38,7 +41,10 @@ jobs:
         run: .github/install-tools.sh
 
       - name: The checks
-        run: just format-check lint shell-check actionlint test versions-check readme-check template-check package-check
+        run: |
+          just format-check lint shell-check actionlint zizmor test versions-check readme-check \
+            template-check package-check
+          just links --offline
 
       # what tytanic compared, for a failing visual test: the reference, the output, the difference
       - name: Keep the tests' output
@@ -70,6 +76,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Read typst.toml
         id: manifest

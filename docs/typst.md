@@ -74,6 +74,8 @@ behind when validation rejects one. The retry then stops with
 Generating needs none: from a clone (`--path`), every kind generates with no network at all, as
 the smoke test generates it; `--git` fetches the template first. After it:
 
+- `just links` (not `just links --offline`, which `just checks` runs): lychee fetches each link
+  -- a day's passes cached (`.lycheecache`).
 - dprint, on its first run (`just dprint-check`, the hooks): its plugins, `dprint.json`'s URLs;
   then from its cache.
 - typst-package-check: built from source by `nix develop` (crates.io), or pulled as its image
@@ -100,6 +102,10 @@ the template compile offline; git and the commit-message check (`cog`) need none
 | `keywords`        | *(empty)*                   | `keywords` (comma-separated)                                    |
 | `categories`      | none; `report` (a template) | `categories`, at most three of Universe's; a template needs one |
 | `disciplines`     | *(empty)*                   | `disciplines`, of Universe's list                               |
+| `citation`        | `false`                     | `CITATION.cff`, only if true -- see below                       |
+| `family_names`    | — (with `citation`)         | `CITATION.cff`'s author                                         |
+| `given_names`     | *(empty)*                   | `CITATION.cff`'s author -- omitted if blank                     |
+| `orcid`           | *(empty)*                   | `CITATION.cff`'s author, as its URL -- omitted if blank         |
 
 Every answer is validated at the prompt, against Universe's rules where it has one: its 19
 categories and 39 disciplines, a GitHub handle as its bundler checks it in `authors`, nothing that
@@ -110,6 +116,15 @@ any file is written -- only the empty directory above is
 and no "typst", as Universe's naming rules ask -- and, as no regex can say it, a description without
 "Typst" and a GitHub handle of at most 39 characters. What a hook cannot judge -- that the name is
 not the obvious, canonical one for what the package does -- is typst/packages' review.
+
+`family_names`, `given_names` and `orcid` are asked with `citation` alone. With it, the project
+gets a `CITATION.cff` (Citation File Format 1.2.0): GitHub shows it as "Cite this repository", and
+Zenodo, enabled for the repository, archives each GitHub release with it as its metadata and mints
+a DOI; the package's bundle leaves it out (`.gitattributes`). Its author is asked by parts, as
+Zenodo's import takes them: the family names (required: it refuses an author without), the given
+names and an ORCID iD (`0000-0002-1825-0097`; its check digit is Zenodo's to verify), none with a
+comma, which it reads as the family names' end. It carries no version or date: no release moves
+them. The flake's `citation` check validates it against CFF's schema.
 
 ### What `project_kind` selects
 
@@ -147,15 +162,17 @@ justfile              `just checks` = what CI runs; `just format`, `just bundle`
 .editorconfig         shfmt's style, for the shell scripts and the git hooks
 flake.nix, flake.lock the tools (the dev shell's, CI's), `nix fmt` and the checks; the lock pins
                       nixos-unstable, every tool's version with it
-.githooks/            opt-in (`just install-hooks`): formatting, the shell, the workflows, the
-                      imports' versions and dprint before a commit; Conventional Commits for the
-                      message and the push
+.githooks/            opt-in (`just install-hooks`): formatting, the shell, the workflows
+                      (actionlint, zizmor), the imports' versions and dprint before a commit;
+                      Conventional Commits for the message and the push
 cliff.toml, cog.toml  git-cliff changelogs, cocogitto's commit checks
 dprint.json           Markdown and TOML formatting, its plugins pinned (`just dprint-update`)
+lychee.toml           the link check's settings (`just links`): the repository left out
+CITATION.cff          the citation, with `citation`
 AGENTS.md             the rules: the public API, warnings, what a package can hold, the tests
 CONTRIBUTING, SECURITY, CODE_OF_CONDUCT
 LICENSE (+ LICENSE-MIT, LICENSE-APACHE, LICENSE-MIT-0 by the choice and the kind)
-.github/              6 workflows, dependabot, issue and PR templates, the tools' and the
+.github/              7 workflows, dependabot, issue and PR templates, the tools' and the
                       release notes' scripts
 ```
 
@@ -164,13 +181,14 @@ LICENSE (+ LICENSE-MIT, LICENSE-APACHE, LICENSE-MIT-0 by the choice and the kind
 `just checks` runs, in order: typstyle over every `.typ` file; tinymist's linter over the package
 from its entrypoint and a template package's template; shellcheck and shfmt over the shell scripts,
 the git hooks and the justfile's script recipes (read out of `just --dump`); actionlint over the
-workflows; the tests; every `@preview/<name>:<version>` import against `typst.toml`'s version; each
-`typ` block of the README compiled alone, importing the bundle; a template package's template, as
-`typst init` makes it from the bundle, compiled; typst-package-check on the bundle; dprint; `cog
-check`; and last the flake: `nix fmt -- --ci` (nixfmt, shfmt, typstyle and just's own, through
-treefmt; it formats, and fails if that changed a file) and its checks. A compiler warning fails each
-compile, and a lint or a package-check warning fails too -- a warning on Universe is a review
-comment.
+workflows, then zizmor's audit of them and of Dependabot's configuration, offline; the local links
+of the files git tracks (lychee, offline); the tests; every `@preview/<name>:<version>` import
+against `typst.toml`'s version; each `typ` block of the README compiled alone, importing the bundle;
+a template package's template, as `typst init` makes it from the bundle, compiled;
+typst-package-check on the bundle; dprint; `cog check`; and last the flake: `nix fmt -- --ci`
+(nixfmt, shfmt, typstyle and just's own, through treefmt; it formats, and fails if that changed a
+file) and its checks. A compiler warning fails each compile, and a lint or a package-check warning
+fails too -- a warning on Universe is a review comment.
 
 The bundle (`just bundle`, `dist/preview/<name>/<version>`) is `git archive` of the repository, less
 what `.gitattributes` marks `export-ignore` -- the tooling, the tests, the contributors' documents
@@ -205,9 +223,12 @@ be another version, and judge apart from CI.
   compiles the README and the template on `compiler`'s Typst (`just floor`): the floor is tested,
   not declared.
 - `nix.yml` -- `nix fmt -- --ci`, then `nix flake check`, on x86_64 Linux, aarch64 Linux and Apple
-  silicon: the format, the lints, the shell, the workflows, the tests (so the references hold on
-  each), and typst-package-check built from its flake input (nixpkgs carries none, so an update
-  that breaks its build shows here); every system also evaluated.
+  silicon: the format, the lints, the shell, the workflows (actionlint, zizmor), the local links,
+  the citation (if any), the tests (so the references hold on each), and typst-package-check built
+  from its flake input (nixpkgs carries none, so an update that breaks its build shows here); every
+  system also evaluated.
+- `links.yml` -- every link of the files git tracks, online (`just links`, lychee), monthly and
+  on demand: a page moves or goes with nothing changed here.
 - `publish.yml` -- see below.
 - `style-check-dprint.yml`, `style-check-cocogitto.yml` -- formatting, and Conventional Commits:
   every commit, and a pull request's title (a squash merge makes it the commit).

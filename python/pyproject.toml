@@ -90,6 +90,7 @@ dev = [
 {%- if project_kind == "workspace" %}
     "packaging==26.3", # tests/test_workspace.py reads the members' requirements with it
 {%- endif %}
+    "mutmut==3.8.0",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
@@ -164,6 +165,9 @@ pythonVersion = "{{python_min}}"
 # editable install)
 {%- if project_kind == "workspace" %}
 include = ["packages", "tests"]
+# each member's mutants/ (`just mutation`) is mutmut's copy, not the code; pyright's own defaults
+# kept, as an exclude replaces them
+exclude = ["**/mutants", "**/node_modules", "**/__pycache__", "**/.*"]
 extraPaths = [
     "packages/{{project-name}}/src",
     "packages/{{project-name}}-core/src",
@@ -207,11 +211,21 @@ source = ["{{crate_name}}"]
 fail_under = 100
 show_missing = true
 
+{%- if project_kind != "workspace" %}
+
+[tool.mutmut]
+# the code mutated (`just mutation`), a mutant at a time, each against the tests, in mutants/ (which
+# git ignores): a copy of it, the tests and this file. A workspace's members each hold their own.
+source_paths = ["src"]
+{%- endif %}
+
 [tool.vulture]
 # the tests too: they are what uses a library's public API; a fixture is used by name, which
 # vulture cannot see
 {%- if project_kind == "workspace" %}
 paths = ["packages", "tests"]
+# each member's mutants/ (`just mutation`): mutmut's copy, not the code
+exclude = ["mutants/"]
 {%- else %}
 paths = ["src", "tests"]
 {%- endif %}

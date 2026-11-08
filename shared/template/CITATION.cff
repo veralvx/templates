@@ -1,0 +1,36 @@
+# The citation GitHub's "Cite this repository" and Zenodo read (Citation File Format 1.2.0). No
+# version or date-released: no release here moves them, and a stale one would be cited.
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+title: "{{project-name}}"
+abstract: "{{description}}"
+authors:
+  - family-names: "{{family_names}}"
+{%- if given_names != "" %}
+    given-names: "{{given_names}}"
+{%- endif %}
+{%- if author_email != "" %}
+    email: "{{author_email}}"
+{%- endif %}
+{%- if orcid != "" %}
+    orcid: "https://orcid.org/{{orcid}}"
+{%- endif %}
+{%- if keywords != "" %}
+keywords:
+{%- assign keyword_list = keywords | split: "," %}
+{%- for keyword in keyword_list %}
+  - "{{ keyword | strip }}"
+{%- endfor %}
+{%- endif %}
+{%- if license == "MIT OR Apache-2.0" %}
+# MIT OR Apache-2.0, as CFF writes an OR; Zenodo's import refuses a list, so it archives no release
+# until zenodo/zenodo-rdm#1509 is fixed
+license:
+  - MIT
+  - Apache-2.0
+{%- else %}
+license: {{license}}
+{%- endif %}
+repository-code: "https://github.com/{{github_username}}/{{project-name}}"
+# Zenodo's concept DOI, every version's, to uncomment once it has archived a release
+# doi: "10.5281/zenodo.0000000"

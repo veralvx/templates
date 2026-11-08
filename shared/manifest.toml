@@ -29,6 +29,8 @@
 [template]
 ".github/ISSUE_TEMPLATE/config.yml" = "all"
 ".github/ISSUE_TEMPLATE/feature_request.md" = "all"
+".github/workflows/links.yml" = "all"
+"CITATION.cff" = "all"
 "CODE_OF_CONDUCT.md" = "all"
 "LICENSE-APACHE" = "all"
 "LICENSE-MIT" = "all"

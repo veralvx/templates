@@ -33,7 +33,7 @@ updates:
           - "minor"
           - "patch"
     cooldown:
-      default-days: 3
+      default-days: 7
 
   # the flake's inputs, monthly, in one pull request (Dependabot's `nix` ecosystem: nixpkgs to its
   # branch's newest commit): every tool with them, the dev shell's and CI's, so its checks are the
@@ -64,3 +64,5 @@ updates:
       flake-inputs:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7

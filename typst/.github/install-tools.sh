@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # The tools CI runs, onto PATH, at the versions flake.lock locks: the flake's `tools` (nixpkgs'
-# typst, tytanic, typstyle, tinymist, just, jq, shellcheck, shfmt and actionlint), which Nix
-# fetches from its binary cache; and typst-package-check as the image typst/packages' CI runs (its
-# action.yml), at the tag the flake's `package-check` input names -- nixpkgs builds none of it --
-# pulled here, and a command that runs it on the working directory.
+# typst, tytanic, typstyle, tinymist, just, jq, shellcheck, shfmt, actionlint, zizmor and lychee),
+# which Nix fetches from its binary cache; and typst-package-check as the image typst/packages' CI
+# runs (its action.yml), at the tag the flake's `package-check` input names -- nixpkgs builds none
+# of it -- pulled here, and a command that runs it on the working directory.
 # checks.yml's and publish.yml's, on Linux runners with Nix and Docker (and jq, the runner's, which
 # reads flake.lock before the tools are there).
 set -euo pipefail

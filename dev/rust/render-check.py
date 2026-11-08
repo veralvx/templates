@@ -29,7 +29,7 @@ from collections.abc import Mapping
 # dev/ and dev/rust/ named, not left to the script's own folder: `python -I` leaves that out
 sys.path += [str(pathlib.Path(__file__).resolve().parents[1]), str(pathlib.Path(__file__).resolve().parent)]
 from msrv import MSRV_FLOOR, Release, msrv_regex, msrv_span, rust_releases  # noqa: E402 - dev/rust/, put on the path above
-from render_core import IMAGE_LABELS, Case, Check, image_answer, image_wanted, run  # noqa: E402 - dev/, put on the path above
+from render_core import CITATIONS, IMAGE_LABELS, Case, Check, citation, citation_label, image_answer, image_wanted, run  # noqa: E402 - dev/, put on the path above
 
 # the template's names, one sample answer per prompt (render_core's SAMPLE_BUILTINS the rest of
 # cargo-generate's own); `CASES` varies them
@@ -48,11 +48,12 @@ BASE_VARS = {
 # each kind's container_image answers (render_core's IMAGE_LABELS)
 IMAGES = {"bin": (True, False), "lib": (None, True), "both": (True, False), "workspace": (True, False)}
 CASES = [
-    {"project_kind": k, "license": lic, **extra} | image_answer(image)
+    {"project_kind": k, "license": lic, **extra, **cited} | image_answer(image)
     for k in ("bin", "lib", "both", "workspace")
     for image in IMAGES[k]
     for lic in ("MIT OR Apache-2.0", "MIT", "Apache-2.0")
     for extra in ({}, {"author_email": ""})
+    for cited in CITATIONS
 ]
 
 
@@ -61,6 +62,7 @@ def label(case: Mapping[str, object]) -> str:
         f"{case['project_kind']}/{case['license']}"
         + ("/no-email" if case.get("author_email") == "" else "")
         + IMAGE_LABELS[case.get("container_image")]
+        + citation_label(case)
     )
 
 
@@ -235,7 +237,7 @@ if __name__ == "__main__":
             cases=CASES,
             label=label,
             rules=(starter_code, member_licences),
-            case_rules=(manifest, members, image, publishing),
+            case_rules=(manifest, members, image, publishing, citation),
             final_rules=(lock_and_msrv,),
         )
     )

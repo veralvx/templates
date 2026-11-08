@@ -1,9 +1,9 @@
 # The flake's formatter (`nix fmt`), then its checks (nix/checks.nix): the tests and types on each
 # Python .python-versions lists that nixpkgs caches (nix/pythons.nix; checks.yml tests every one),
-# against the built packages; lint, the format, the shell, the workflows, dead code, the pins, the
-# command -- built on each system the flake declares: x86_64 and aarch64 Linux, Apple silicon
-# (macos-latest). A runner builds its own system's alone, so every system is also evaluated, nothing
-# built, in one job.
+# against the built packages; lint, the format, the shell, the workflows (actionlint, zizmor), the
+# local links, dead code, the citation (if any), the pins, the command -- built on each system the
+# flake declares: x86_64 and aarch64 Linux, Apple silicon (macos-latest). A runner builds its own
+# system's alone, so every system is also evaluated, nothing built, in one job.
 name: Nix
 
 on:
@@ -34,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         # flakes on, and the job's token for GitHub fetches
@@ -53,6 +55,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3

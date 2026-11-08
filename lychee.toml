@@ -1,0 +1,17 @@
+# lychee (`just links`): the links of the files git tracks, the template roots and
+# shared/template/ aside -- their Liquid makes links a generated project checks, rendered.
+
+# a link that passed, cached a day (.lycheecache, which git ignores)
+cache = true
+max_cache_age = "1d"
+# a refused connection or a 429 retried 10 s apart: a brief outage waited out
+retry_wait_time = 10
+
+exclude = [
+    # built at run time: from a variable or a format string
+    '\$|\{|%7B',
+    # a host with no dot, which no public one lacks: a regex's text cut short (`plugins\.dprint`)
+    "^https?://[^/.]+(/|$)",
+    # GitHub's bare address: the prefix code builds a repository's from
+    '^https://github\.com/$',
+]

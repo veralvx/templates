@@ -234,6 +234,19 @@ from a tag; what changed since is this repository's history. Also run here:
   `MSRV_FLOOR`. Not run: cargo on 1.98, whose toolchain this machine cannot
   download.
 
+- **zizmor, lychee, cargo-mutants and the citation**, added here: zizmor
+  1.31.1's findings on the workflows and Dependabot's configuration (a
+  checkout's kept credential, a 3-day cooldown, the nix entry's none) fixed,
+  and `just zizmor` finds none in each kind -- dist's `release.yml` left out,
+  which, written by `dist init`, draws about forty (unpinned actions, template
+  injections...) that only dist can fix; `just links --offline` passes in each;
+  `just mutants` (cargo-mutants 27.1.0) catches every mutant of the starter
+  library (2), the binary's emptied `main` skipped in `.cargo/mutants.toml` --
+  no test runs the binary, and one that spawned it would fail under Miri;
+  render-check refuses a CITATION.cff field misnamed. `just smoke rust` passes
+  for every kind, its flake's checks built (the citation's cffconvert, the
+  links' and zizmor's among them).
+
 ### In rust-template, before the move
 
 The template was driven end to end with the real tooling, not reasoned about.

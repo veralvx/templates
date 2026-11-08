@@ -16,7 +16,9 @@ permissions: {}
 
 jobs:
   publish-crates:
-    uses: ./.github/workflows/publish-crates.yml
+    # `./`, not GitHub's newer `$/` (zizmor's self-repository): actionlint, which every workflow
+    # passes, refuses it
+    uses: ./.github/workflows/publish-crates.yml # zizmor: ignore[self-repository]
     permissions:
       contents: read
       id-token: write

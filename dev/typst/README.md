@@ -154,6 +154,15 @@ branch and from a tag; what changed since is this repository's history. Also run
   `compiler` alone, which CI's second job and `just floor` read; the references' paths. Not run: a
   Typst newer than the lock's, and so a reference re-rendered.
 
+- **zizmor, lychee and the citation**, added here: zizmor 1.31.1's findings on the workflows and
+  Dependabot's configuration (a checkout's kept credential where nothing needs it, a 3-day
+  cooldown) fixed -- the fork's checkout in `publish.yml` keeps its token, which its partial clone
+  and push use, said so (`persist-credentials: true`) -- and `just zizmor` finds none in either
+  kind; `just links --offline` passes in each; CITATION.cff and lychee.toml are export-ignored, so
+  the bundle holds neither; render-check refuses a CITATION.cff field misnamed. `just smoke typst`
+  passes for both kinds, and `just nix` in each (8 flake checks, the citation's cffconvert and the
+  links' among them).
+
 ### In typst-template, before the move
 
 The template was driven end to end with the real tools, not reasoned about. With **cargo-generate**, **typst**, **tytanic**, **typstyle**, **tinymist**,

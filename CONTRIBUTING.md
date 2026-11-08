@@ -18,6 +18,10 @@ its own flake's -- or, installed yourself:
   the shell's linter and formatter (its style is `.editorconfig`'s).
 - **[actionlint](https://github.com/rhysd/actionlint)** -- lints the workflows, this repository's
   and every template's.
+- **[zizmor](https://docs.zizmor.sh/)** -- audits the workflows' security, this repository's and
+  every template's, and Dependabot's configuration; offline.
+- **[lychee](https://lychee.cli.rs/)** -- checks the links of the files git tracks but the template
+  roots' (`just links`; `links.yml` monthly, online).
 - **[dprint](https://dprint.dev/)** -- formats the Markdown and TOML.
 - **[cocogitto](https://docs.cog.tools/)** (`cog`) -- enforces Conventional Commits.
 - **[git-cliff](https://git-cliff.org/)**, for maintainers: `just changelog` and `just release`
@@ -39,11 +43,11 @@ its own flake's -- or, installed yourself:
 git clone https://github.com/<you>/templates && cd templates
 ```
 
-3. Optionally, `just install-hooks`: `.githooks/` then checks the shell, the workflows and dprint
-   before each commit, the message as a Conventional Commit, and every pushed commit's message
-   before a push -- what CI would refuse, minutes earlier. They need `just`, `jq`, `shellcheck`,
-   `shfmt`, `actionlint`, `dprint` and `cog` on `PATH` (inside `nix develop`, with Nix);
-   `git config --unset core.hooksPath` turns them off.
+3. Optionally, `just install-hooks`: `.githooks/` then checks the shell, the workflows (actionlint,
+   zizmor) and dprint before each commit, the message as a Conventional Commit, and every pushed
+   commit's message before a push -- what CI would refuse, minutes earlier. They need `just`, `jq`,
+   `shellcheck`, `shfmt`, `actionlint`, `zizmor`, `dprint` and `cog` on `PATH` (inside
+   `nix develop`, with Nix); `git config --unset core.hooksPath` turns them off.
 
 ## Guidelines
 
@@ -63,7 +67,7 @@ contributions alike. Each template's own checks, and what was verified of it, ar
 
 ```sh
 just checks                    # every render-check, sync, no tool version by hand, the shell,
-                               # the workflows, dprint, cog, the flake's last
+                               # the workflows, the local links, dprint, cog, the flake's last
 just render-check [template]   # every templated file rendered for its answer combinations, checked
 just sync                      # the shared files copied from shared/ (`just sync --check`: checked)
 just smoke <template> <kind>   # generated with cargo-generate, then its own checks
@@ -71,6 +75,8 @@ just generate <template> <kind>  # into target/<template>/<kind>/demo, to look a
 just lock-update [template]    # its flake.lock moved, and what follows it; none: every template's
 just shell-check               # shellcheck and shfmt, this repository's (each template's:
                                # `just template-shell-check`)
+just zizmor                    # the workflows' security audit, offline, the templates' too
+just links [--offline]         # lychee over the files git tracks but the template roots'
 just format                    # every formatter the checks hold the files to, `nix fmt` last
 ```
 
@@ -80,11 +86,14 @@ just format                    # every formatter the checks hold the files to, `
 (no tool version by hand: each a lock's, but cargo-generate's floor; every action at its commit);
 `just shell-check` (shellcheck and shfmt over every shell script, the git hooks and the root
 justfile's script recipes) and `just template-shell-check` (each template's, its justfile's recipes
-included); actionlint over every workflow, the root's and each template's; dprint over the root's
-Markdown and TOML (a template root's are a generated project's); `cog check`; and `just nix` -- `nix
-fmt -- --ci` (nixfmt, shfmt and just's own, through treefmt; it formats, and fails if that changed a
-file), every system evaluated and the flake's checks, which run the shell and actionlint again in
-the sandbox.
+included); actionlint over every workflow, the root's and each template's; `just zizmor` (zizmor's
+audit of the same, offline, and of the root's Dependabot configuration: a template's, which can hold
+Liquid, is its generated project's to audit); `just links --offline` (the local links of the files
+git tracks but the template roots'); dprint over the root's Markdown and TOML (a template root's are
+a generated project's); `cog check`; and `just nix` -- `nix fmt -- --ci` (nixfmt, shfmt and just's
+own, through treefmt; it formats, and fails if that changed a file), every system evaluated and the
+flake's checks, which run the shell, actionlint, zizmor and the local links again in the sandbox.
+`links.yml` checks every link online, monthly.
 
 ## Creating a Pull Request
 

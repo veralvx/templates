@@ -62,6 +62,7 @@ exclude = [
     "/flake.lock",
     "/flake.nix",
     "/justfile",
+    "/lychee.toml",
     "/rust-toolchain.toml",
 ]
 

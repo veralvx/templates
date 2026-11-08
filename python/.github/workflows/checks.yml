@@ -1,7 +1,8 @@
 # The lock (current, `--locked`) and the dev group's checks (ruff, basedpyright, ty advisory,
 # vulture, pytest with its coverage gate) on every Python .python-versions lists, through uv: the
-# versions read from the file at run time, so it stays the one place they are named. nix.yml runs
-# the tests and basedpyright against the built packages (ruff and vulture once), on Linux and macOS.
+# versions read from the file at run time, so it stays the one place they are named; then mutmut,
+# once, in the dev shell (`just mutation`). nix.yml runs the tests and basedpyright against the
+# built packages (ruff and vulture once), on Linux and macOS.
 name: Checks
 
 on:
@@ -30,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Read .python-versions
         id: read
@@ -47,6 +50,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
         # pyproject.toml's required-version
@@ -67,15 +72,36 @@ jobs:
 
       - name: Types (basedpyright)
         # this Python's: pyproject's pythonVersion is the floor, which `just static` checks
-        run: uv run --no-sync basedpyright --pythonversion ${{ matrix.python-version }}
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: uv run --no-sync basedpyright --pythonversion "$PYTHON_VERSION"
 
       - name: Types (ty, advisory)
         # never failing the build until ty is stable (its own README: pre-release)
         continue-on-error: true
-        run: uv run --no-sync ty check --python-version ${{ matrix.python-version }} --output-format=github
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: uv run --no-sync ty check --python-version "$PYTHON_VERSION" --output-format=github
 
       - name: Dead code
         run: uv run --no-sync vulture
 
       - name: Pytest
         run: uv run --no-sync pytest --cov -n auto
+
+  mutation:
+    name: Mutation (mutmut)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+
+      # in the dev shell, its oldest Python: mutmut's exit status counts no mutant the tests leave
+      # alive, which the recipe reads from `mutmut results`
+      - name: just mutation
+        run: nix develop --command just mutation

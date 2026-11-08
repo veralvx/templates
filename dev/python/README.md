@@ -164,6 +164,17 @@ this repository's history. Also run here:
   build tools still build so (23), and with none cached (a 3.15 floor) its tests and types on it too
   (59 in all). Not run: a 3.15 check built.
 
+- **zizmor, lychee, mutmut and the citation**, added here: zizmor 1.31.1's findings on the
+  workflows and Dependabot's configuration (a checkout's kept credential, a 3-day cooldown, a
+  matrix value spliced into a `run:` script) fixed, and `just zizmor` finds none in each kind;
+  `just links --offline` passes in each, the lock left out (its archives' URLs); `just mutation`
+  (mutmut 3.8.0) kills every mutant of each kind's starter code -- a workspace's from each member's
+  folder, as mutmut names a mutant by its path from the run's -- after a `--help` test for the
+  strings it changed and `# pragma: no mutate` on the namespace argparse's default stands in for,
+  and fails on the survivors it lists; render-check refuses a CITATION.cff field misnamed, and the
+  flake's `citation` check (cffconvert) passes on the answers' citation. `just smoke python` passes
+  for every kind, with Nix (the flake's checks built), its citation answered.
+
 ### In python-template, before the move
 
 The template was driven end to end with the real tools, not reasoned about. With **cargo-generate**, **uv** and the dev group's pins (ruff, basedpyright, ty,

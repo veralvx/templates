@@ -50,6 +50,14 @@ miri:
 clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
+# cargo-mutants: each mutant of the code -- a function's body replaced, an operator swapped -- built
+# and run against the tests, in a copy of the tree (mutants.out/ the report); one they do not catch
+# fails it: a test missing, or a change that keeps the behaviour, which .cargo/mutants.toml skips
+# with the reason.
+[doc("Mutation testing (cargo-mutants): every mutant of the code caught by the tests")]
+mutants:
+    cargo mutants --workspace --all-features --cargo-arg=--locked
+
 [doc("The code's format, checked (rustfmt)")]
 fmt-check:
     cargo fmt --all -- --check
@@ -66,6 +74,37 @@ cog:
 [doc("The workflows linted (actionlint)")]
 actionlint:
     actionlint
+
+# zizmor, offline -- an audit that would ask GitHub is skipped, so the verdict is the same on any
+# connection -- and failing, not warning, on a file it cannot read: Dependabot's configuration and
+# every workflow but release.yml, which is dist's (`dist init` writes it, `dist plan` refuses
+# another): its findings are dist's to fix, and an edit would not survive the next `dist init`.
+[doc("The workflows' security audited (zizmor), dist's release.yml aside, and Dependabot's configuration")]
+zizmor:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s nullglob
+    inputs=()
+    for file in .github/dependabot.yml .github/workflows/*.yml .github/workflows/*.yaml; do
+        if [ "$file" != .github/workflows/release.yml ]; then inputs+=("$file"); fi
+    done
+    zizmor --offline --strict-collection --quiet "${inputs[@]}"
+
+# lychee over the files git does not ignore, as lychee.toml says. Online, each link fetched
+# (links.yml, monthly); `just links --offline` checks the local ones alone, `just checks`'s: the
+# same verdict on any connection. A GITHUB_TOKEN in the environment spares GitHub's rate limit.
+[doc("The links checked (lychee): just links [--offline]")]
+[positional-arguments]
+links *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # a process substitution's failure goes unseen (set -e): outside a repository, ls-files' would
+    git rev-parse --is-inside-work-tree > /dev/null
+    files=()
+    while IFS= read -r -d '' file; do
+        if [ -f "$file" ]; then files+=("$file"); fi
+    done < <(git ls-files -z --cached --others --exclude-standard)
+    lychee --no-progress "$@" -- "${files[@]}"
 
 [doc("Markdown and TOML formatted (dprint.json)")]
 dprint-check:
@@ -271,8 +310,9 @@ pins-update:
 # rust-toolchain.toml pins (the MSRV; Miri on nightly), the flake's last:
 # the slowest, and the one a machine without Nix cannot run. CI runs check,
 # test, clippy, fmt and docs on the latest stable, where a lint newer than
-# the MSRV can still fire; the pinned toolchain runs there in the MSRV job
-# and in nix.yml (`nix flake check`, the shell's check among its checks).
+# the MSRV can still fire; the pinned toolchain runs there in the MSRV and
+# mutants jobs and in nix.yml (`nix flake check`, the shell's, the
+# workflows' and the links' checks among its checks).
 #
 # `just` takes only the LAST comment line above a recipe as its doc
 # string, which would show as a fragment in `just --list`; the explicit
@@ -281,12 +321,15 @@ pins-update:
 checks:
     just cargo-check
     just test
+    just mutants
     just miri
     just clippy
     just fmt-check
     just docs-check
     just shell-check
     just actionlint
+    just zizmor
+    just links --offline
     just dprint-check
     just cog
     just audit

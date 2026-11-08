@@ -80,6 +80,8 @@ the smoke test generates it; `--git` fetches the template first. After it:
   from GitHub) if it is not installed. The dev shell's is its own (`UV_PYTHON_DOWNLOADS=never`).
 - `just audit` (and `just checks`): pip-audit asks PyPI of each package -- its own cache answers
   for fifteen minutes after, as PyPI allows.
+- `just links` (not `just links --offline`, which `just checks` runs): lychee fetches each link
+  -- a day's passes cached (`.lycheecache`).
 - dprint, on its first run (`just dprint-check`, the hooks): its plugins, `dprint.json`'s URLs;
   then from its cache.
 - `nix develop` and the flake's checks: the lock's inputs and its tools, from GitHub and Nix's
@@ -101,6 +103,10 @@ git and the commit-message check (`cog`) need none.
 | `python_min`      | `3.13`              | `requires-python`, `.python-versions`, classifiers, ruff, pyright |
 | `keywords`        | *(empty)*           | `project.keywords` (comma-separated)                              |
 | `container_image` | `true` (not `lib`)  | the flake's `image` and `image.yml` -- see below                  |
+| `citation`        | `false`             | `CITATION.cff`, only if true -- see below                         |
+| `family_names`    | — (with `citation`) | `CITATION.cff`'s author                                           |
+| `given_names`     | *(empty)*           | `CITATION.cff`'s author -- omitted if blank                       |
+| `orcid`           | *(empty)*           | `CITATION.cff`'s author, as its URL -- omitted if blank           |
 
 Every answer is validated at the prompt: the description, the author and the email cannot hold a
 `"` or `\` (they land in TOML strings), nor the description a `$` (it lands in a Nix string). The
@@ -109,7 +115,16 @@ project name is checked before anything is written
 ASCII Python identifier, no keyword and no standard-library module's: `3d-tool`, `async` or
 `calendar` is refused.
 
-`container_image` is asked for `bin` and `workspace` alone: a library has no command to run.
+`container_image` is asked for `bin` and `workspace` alone: a library has no command to run;
+`family_names`, `given_names` and `orcid` with `citation` alone.
+
+With `citation`, the project gets a `CITATION.cff` (Citation File Format 1.2.0): GitHub shows it
+as "Cite this repository", and Zenodo, enabled for the repository, archives each GitHub release with
+it as its metadata and mints a DOI. Its author is asked by parts, as Zenodo's import takes them:
+the family names (required: it refuses an author without), the given names and an ORCID iD
+(`0000-0002-1825-0097`; its check digit is Zenodo's to verify), none with a comma, which it reads
+as the family names' end. It carries no version or date: no release moves them. The flake's
+`citation` check validates it against CFF's schema.
 
 ### What `project_kind` selects
 
@@ -166,17 +181,21 @@ justfile              `just checks` = what CI runs, the flake's checks last; `ju
                       `just release`
 flake.nix, nix/       the dev shell, `nix fmt`, the packages, the checks, the image (if chosen);
                       flake.lock pins nixpkgs (nixos-unstable)
-.githooks/            opt-in (`just install-hooks`): the lock, ruff, the shell, the workflows,
-                      dprint before a commit; Conventional Commits for the message and the push
+.githooks/            opt-in (`just install-hooks`): the lock, ruff, the shell, the workflows
+                      (actionlint, zizmor), dprint before a commit; Conventional Commits for the
+                      message and the push
 .editorconfig         shfmt's style, for the shell scripts and the git hooks
 cliff.toml, cog.toml  git-cliff changelogs, cocogitto's commit checks
 dprint.json           Markdown and TOML formatting, its plugins pinned (`just dprint-update`)
-src/, tests/          starter code: typed, documented, every line and branch tested
+lychee.toml           the link check's settings (`just links`): the project's own pages left out
+CITATION.cff          the citation, with `citation`
+src/, tests/          starter code: typed, documented, every line and branch tested, every
+                      mutant killed (`just mutation`: mutmut)
                       (a workspace puts these under packages/<name>/ and packages/<name>-core/)
 AGENTS.md             the lint and type policy, and what to do when a rule fires
 README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT
 LICENSE-MIT / LICENSE-APACHE (a workspace member carries its own copies)
-.github/              8 workflows (9 with the image), dependabot, issue and PR templates,
+.github/              9 workflows (10 with the image), dependabot, issue and PR templates,
                       the tag, release-notes (and image registries) scripts
 ```
 
@@ -195,14 +214,18 @@ nixpkgs they were taken from.
 ### The CI workflows
 
 - `checks.yml` -- the lock, ruff (lint and format), basedpyright, ty (advisory), vulture, and
-  pytest with its coverage gate, on every Python `.python-versions` lists.
+  pytest with its coverage gate, on every Python `.python-versions` lists; then mutmut, once, in
+  the dev shell (`just mutation`): a mutant no test kills fails it.
 - `nix.yml` -- `nix fmt -- --ci` (nixfmt, shfmt and just's own, through treefmt: it formats, and
   fails if that changed a file), then `nix flake check`, on x86_64 Linux, aarch64 Linux and Apple
   silicon: the tests and the types on each Python nixpkgs caches against the built packages, ruff,
   the format, the shell (`just shell-check`: shellcheck and shfmt over the scripts, the hooks and
-  the justfile's script recipes), the workflows (actionlint), dead code, the pins, and the command
-  run through its wrapper; every system also evaluated.
+  the justfile's script recipes), the workflows (actionlint and zizmor, offline), the local links
+  (lychee), dead code, the citation (if any), the pins, and the command run through its wrapper;
+  every system also evaluated.
 - `security.yml` -- pip-audit over the exported lock, daily and when the lock changes.
+- `links.yml` -- every link of the files git tracks, online (`just links`, lychee), monthly and
+  on demand: a page moves or goes with nothing changed here.
 - `dependency-review.yml` -- licence and advisory review on pull requests.
 - `style-check-dprint.yml`, `style-check-cocogitto.yml` -- formatting, and Conventional Commits:
   every commit, and a pull request's title (a squash merge makes it the commit).

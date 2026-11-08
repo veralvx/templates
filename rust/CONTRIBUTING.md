@@ -25,6 +25,10 @@ or, installed yourself:
   recipes through jq.
 - **[actionlint](https://github.com/rhysd/actionlint)** -- lints the workflows
   (and, through ShellCheck, their `run:` scripts).
+- **[zizmor](https://docs.zizmor.sh/)** -- audits the workflows' security, and
+  Dependabot's configuration, offline.
+- **[lychee](https://lychee.cli.rs/)** -- checks the links of the files git
+  tracks (`just links`; `links.yml` monthly, online).
 - **[cocogitto](https://docs.cog.tools/)** (`cog`) -- enforces Conventional
   Commits.
 - **A nightly toolchain with the `miri` component**
@@ -32,6 +36,8 @@ or, installed yourself:
   `cargo +nightly miri test`, and so does CI.
 - **cargo-audit** (`cargo install cargo-audit`), for the dependency advisory
   scan.
+- **[cargo-mutants](https://mutants.rs/)** (`cargo install cargo-mutants`), for
+  the mutation tests (`just mutants`).
 - **[git-cliff](https://git-cliff.org/)**, for maintainers: `just changelog`
   and `just release` write the changelog with it.
 - **[Nix](https://nixos.org)** for the last of `just checks`, the flake's
@@ -50,12 +56,12 @@ git clone https://github.com/<you>/{{project-name}} && cd {{project-name}}
 ```
 
 3. Optionally, `just install-hooks`: `.githooks/` then checks formatting, the
-   shell, the workflows and dprint before each commit, the message as a
-   Conventional Commit, and every pushed commit's message before a push --
-   what CI would refuse, minutes earlier. They need `just`, `cargo`, `jq`,
-   `shellcheck`, `shfmt`, `actionlint`, `dprint` and `cog` on `PATH` (inside
-   `nix develop`, with Nix); `git config --unset core.hooksPath` turns them
-   off.
+   shell, the workflows (actionlint, zizmor) and dprint before each commit, the
+   message as a Conventional Commit, and every pushed commit's message before a
+   push -- what CI would refuse, minutes earlier. They need `just`, `cargo`,
+   `jq`, `shellcheck`, `shfmt`, `actionlint`, `zizmor`, `dprint` and `cog` on
+   `PATH` (inside `nix develop`, with Nix); `git config --unset core.hooksPath`
+   turns them off.
 
 ## Guidelines
 
@@ -86,6 +92,10 @@ with `#[expect(lint, reason = "...")]` explaining why the lint is wrong there.
   what a downstream dependent sees. Anything you intend to publish should be
   reachable from there.
 {% endif -%}
+- **Mutations:** `just mutants` changes the code a mutant at a time
+  (cargo-mutants) and fails on each one the tests do not catch -- a test
+  missing, or a change that keeps the behaviour, which `.cargo/mutants.toml`
+  skips with the reason. `mutants.out/` holds the report.
 - **Doctests:** examples in rustdoc are compiled and run. `--all-targets` skips
   them, which is why `just test` runs `cargo test --doc` as a separate step
   whenever the package has a library target.
@@ -101,18 +111,20 @@ with `#[expect(lint, reason = "...")]` explaining why the lint is wrong there.
 just checks
 ```
 
-That runs twelve recipes in order: `cargo check`, the test suite, Miri,
-`cargo clippy` with warnings denied, `cargo fmt --check`, a docs build with
-warnings denied, the shell (`just shell-check`), the workflows (actionlint),
-`dprint check`, `cog check`, `cargo audit`, and last the flake (`just nix`:
-`nix fmt -- --ci`, every system evaluated, this one's checks built) -- the set
-the workflows under `.github/workflows/` run, here on the toolchain
-`rust-toolchain.toml` pins (Miri on nightly). CI's Rust jobs (check, test,
-clippy, fmt, docs) run on the latest stable, where a lint newer than the MSRV
-can still fire; the pinned toolchain runs there in the MSRV job (check, test)
-and in `nix.yml`, the flake's formatter and checks -- clippy, rustfmt, rustdoc
-and the tests, the format, the shell and the workflows in the Nix sandbox --
-which `just nix` runs locally.
+That runs fifteen recipes in order: `cargo check`, the test suite, the mutation
+tests (cargo-mutants), Miri, `cargo clippy` with warnings denied,
+`cargo fmt --check`, a docs build with warnings denied, the shell
+(`just shell-check`), the workflows (actionlint, then zizmor's audit), the local
+links (`just links --offline`), `dprint check`, `cog check`, `cargo audit`, and
+last the flake (`just nix`: `nix fmt -- --ci`, every system evaluated, this
+one's checks built) -- the set the workflows under `.github/workflows/` run,
+here on the toolchain `rust-toolchain.toml` pins (Miri on nightly). CI's Rust
+jobs (check, test, clippy, fmt, docs) run on the latest stable, where a lint
+newer than the MSRV can still fire; the pinned toolchain runs there in the MSRV
+job (check, test), the mutants job and in `nix.yml`, the flake's formatter and
+checks -- clippy, rustfmt, rustdoc and the tests, the format, the shell, the
+workflows, the local links and the citation, if any, in the Nix sandbox -- which
+`just nix` runs locally.
 
 `just fmt` writes what the format checks ask for: rustfmt's, shfmt's, the
 justfile's, dprint's, and last `nix fmt`'s (without Nix, it stops there).
@@ -185,11 +197,25 @@ Then, in whichever order suits you:
   (`namespace/name`) unless it is `<username>/<this repository's name>`. A
   Docker Hub failure holds the GHCR release back too.
 {% endif -%}
+{% if citation -%}
+- To archive each release with a DOI, enable the repository on
+  [Zenodo](https://zenodo.org) (its profile menu → GitHub, the repository's
+  toggle): each GitHub release is then archived, its metadata
+  `CITATION.cff`'s. Once the first is, add its concept DOI, which names every
+  version, to `CITATION.cff` (`doi:`): GitHub's "Cite this repository" gives it
+  from then on.
+{%- if license == "MIT OR Apache-2.0" %}
+  Zenodo's import refuses `CITATION.cff`'s list of licences, the Citation File
+  Format's OR, so it archives no release until
+  [zenodo/zenodo-rdm#1509](https://github.com/zenodo/zenodo-rdm/issues/1509)
+  is fixed.
+{%- endif %}
+{% endif -%}
 - Run `just checks` once to confirm your toolchain is complete: a step that
   stops on a missing command names it -- `just`, `jq`, `shellcheck`, `shfmt`,
-  `actionlint`, `dprint`, `cog`, `cargo-audit`, the nightly Miri component or,
-  last, Nix ([Prerequisites](#prerequisites) lists them; `nix develop` has
-  the rest).
+  `actionlint`, `zizmor`, `lychee`, `dprint`, `cog`, `cargo-audit`,
+  `cargo-mutants`, the nightly Miri component or, last, Nix
+  ([Prerequisites](#prerequisites) lists them; `nix develop` has the rest).
 - `just install-hooks`, if you want git to run the quick checks before each
   commit and push ([Setup](#setup)).
 - Read [AGENTS.md](AGENTS.md) before writing code: the lint policy denies

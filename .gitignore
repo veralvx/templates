@@ -8,3 +8,5 @@ __pycache__/
 # Nix's build links, direnv's cache
 /result*
 /.direnv
+# lychee's cache (`just links`)
+/.lycheecache

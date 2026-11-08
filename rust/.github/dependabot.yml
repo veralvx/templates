@@ -41,8 +41,7 @@ updates:
           - "minor"
           - "patch"
     cooldown:
-      default-days: 3
-      semver-major-days: 7
+      default-days: 7
 
   # ─── GitHub Actions ─────────────────────────────────────────────
   - package-ecosystem: "github-actions"
@@ -73,7 +72,7 @@ updates:
           - "minor"
           - "patch"
     cooldown:
-      default-days: 3
+      default-days: 7
 
   # ─── Nix (the flake's inputs) ───────────────────────────────────
   # monthly, in one pull request, each input to its branch's newest commit,
@@ -114,3 +113,5 @@ updates:
       flake-inputs:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7

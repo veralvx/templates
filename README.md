@@ -39,6 +39,11 @@ to answer them all non-interactively.
   Publishing (no token stored with the repository), rust's binaries through dist; typst's prepares
   its Typst Universe submission. Each makes its GitHub release, the changelog's section its notes.
 - A Nix flake: the development shell, `nix fmt`, the checks as derivations.
+- The workflows audited by zizmor, offline; the links checked by lychee (`just links`: the local
+  ones in `just checks`, every one monthly); python's and rust's code mutated against its tests
+  (`just mutation`: mutmut; `just mutants`: cargo-mutants), each surviving mutant a failure.
+- Optionally, a `CITATION.cff` (GitHub's "Cite this repository", Zenodo's archive), held to its
+  schema by the flake.
 - dprint for the Markdown and TOML, an `.editorconfig` for the shell, and the community documents:
   `CONTRIBUTING.md`, `AGENTS.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, issue and pull request
   templates.
@@ -82,7 +87,7 @@ Each check below is run, not reasoned about; what was verified of each template 
 - **CI.** The template selection (`dev/changes.sh`) and the one gate, `smoke-gate`, run as their
   workflow holds them, over merge commits made as GitHub makes them and every job result -- a
   failed or cancelled job, a template added with no job; every required check reports on every pull
-  request; every workflow passes actionlint.
+  request; every workflow passes actionlint and zizmor's audit.
 - **This repository's own tooling.** The root flake evaluates on every system, with its lock as
   committed, and its checks pass, emulated here as their derivations run them, with the same tool
   versions but git's and awk's; every step of `just checks` passes but the last, the flake's checks,

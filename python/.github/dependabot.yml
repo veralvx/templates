@@ -32,7 +32,7 @@ updates:
           - "minor"
           - "patch"
     cooldown:
-      default-days: 3 # Dependabot's default too (its options reference), set explicitly
+      default-days: 7 # a week for a bad release to be found and yanked: zizmor's floor
 
   # the flake's inputs, monthly, in one pull request (Dependabot's `nix` ecosystem: each input to
   # its branch's newest commit); `just pins-update` on its branch when the `pins` check names a pin
@@ -58,3 +58,5 @@ updates:
       flake-inputs:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7
