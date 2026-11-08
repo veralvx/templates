@@ -162,10 +162,10 @@ actionlint:
 zizmor:
     zizmor --offline --strict-collection --quiet .
 
-# lychee over the files git does not ignore but the lock -- whose archives uv holds to their hashes,
-# and fetches none until a sync -- as lychee.toml says. Online, each link fetched
-# (links.yml, monthly); `just links --offline` checks the local ones alone, `just checks`'s: the
-# same verdict on any connection. A GITHUB_TOKEN in the environment spares GitHub's rate limit.
+# lychee over the files git does not ignore, as lychee.toml says, but the lock: uv holds its
+# archives to their hashes, and fetches none until a sync. Online, each link fetched (links.yml,
+# monthly); `just links --offline` checks the local ones alone, `just checks`'s: the same verdict
+# on any connection. A GITHUB_TOKEN in the environment spares GitHub's rate limit.
 [doc("The links checked (lychee): just links [--offline]")]
 [positional-arguments]
 links *args:

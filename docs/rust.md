@@ -131,14 +131,15 @@ characters per keyword), and neither may be empty:
 nothing to run; `family_names`, `given_names` and `orcid` with `citation`
 alone.
 
-With `citation`, the project gets a `CITATION.cff` (Citation File Format
-1.2.0): GitHub shows it as "Cite this repository", and Zenodo, enabled for the
+With `citation`, the project gets a `CITATION.cff` (Citation File Format 1.2.0):
+GitHub shows it as "Cite this repository", and Zenodo, enabled for the
 repository, archives each GitHub release with it as its metadata and mints a
 DOI. Its author is asked by parts, as Zenodo's import takes them: the family
-names (required: it refuses an author without), the given names and an ORCID
-iD (`0000-0002-1825-0097`; its check digit is Zenodo's to verify), none with a
-comma, which it reads as the family names' end. It carries no version or date:
-no release moves them. The flake's `citation` check validates it against CFF's
+names (required: it refuses an author without), the given names and an ORCID iD
+(`0000-0002-1825-0097`; its check digit is Zenodo's to verify), none with a
+comma, which it reads as the family names' end; its title is the project's name,
+which Zenodo refuses under three characters. It carries no version or date: no
+release moves them. The flake's `citation` check validates it against CFF's
 schema.
 
 ### What `project_kind` selects

@@ -25,7 +25,12 @@ def test_version_is_the_installed_distributions(capsys: pytest.CaptureFixture[st
     assert capsys.readouterr().out == f"{NAME} {version(NAME)}\n"
 
 
-def test_help_says_what_it_does_and_takes(capsys: pytest.CaptureFixture[str]) -> None:
+def test_help_says_what_it_does_and_takes(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # argparse wraps to the terminal's width, and colours its help on 3.14 where asked to
+    monkeypatch.setenv("COLUMNS", "100")
+    monkeypatch.setenv("PYTHON_COLORS", "0")
     with pytest.raises(SystemExit) as stop:
         _ = main(["--help"])
     assert stop.value.code == 0

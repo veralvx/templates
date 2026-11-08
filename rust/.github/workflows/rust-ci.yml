@@ -6,9 +6,10 @@ name: Rust CI (check, test, clippy, fmt, docs, miri, mutants)
 # Toolchains: rust-toolchain.toml pins the MSRV, and rustup obeys that file
 # over the default a toolchain action sets -- so the jobs meant for the
 # latest stable say so with RUSTUP_TOOLCHAIN (which outranks the file), and
-# the MSRV job is the one that builds with the pinned toolchain. Actions are
-# pinned to commits (Dependabot moves them); dtolnay/rust-toolchain is pinned
-# to a commit of its master branch and told the toolchain.
+# the MSRV job builds with the pinned toolchain, as the mutants job does in
+# the flake's dev shell. Actions are pinned to commits (Dependabot moves
+# them); dtolnay/rust-toolchain is pinned to a commit of its master branch and
+# told the toolchain.
 
 on:
   push:
@@ -18,6 +19,7 @@ on:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
       - ".cargo/config.toml"
+      - ".cargo/mutants.toml"
       - "clippy.toml"
       - "rustfmt.toml"
       - "rust-toolchain.toml"

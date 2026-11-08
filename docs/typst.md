@@ -117,14 +117,15 @@ and no "typst", as Universe's naming rules ask -- and, as no regex can say it, a
 "Typst" and a GitHub handle of at most 39 characters. What a hook cannot judge -- that the name is
 not the obvious, canonical one for what the package does -- is typst/packages' review.
 
-`family_names`, `given_names` and `orcid` are asked with `citation` alone. With it, the project
-gets a `CITATION.cff` (Citation File Format 1.2.0): GitHub shows it as "Cite this repository", and
-Zenodo, enabled for the repository, archives each GitHub release with it as its metadata and mints
-a DOI; the package's bundle leaves it out (`.gitattributes`). Its author is asked by parts, as
+`family_names`, `given_names` and `orcid` are asked with `citation` alone. With it, the project gets
+a `CITATION.cff` (Citation File Format 1.2.0): GitHub shows it as "Cite this repository", and
+Zenodo, enabled for the repository, archives each GitHub release with it as its metadata and mints a
+DOI; the package's bundle leaves it out (`.gitattributes`). Its author is asked by parts, as
 Zenodo's import takes them: the family names (required: it refuses an author without), the given
 names and an ORCID iD (`0000-0002-1825-0097`; its check digit is Zenodo's to verify), none with a
-comma, which it reads as the family names' end. It carries no version or date: no release moves
-them. The flake's `citation` check validates it against CFF's schema.
+comma, which it reads as the family names' end; its title is the project's name, which Zenodo
+refuses under three characters. It carries no version or date: no release moves them. The flake's
+`citation` check validates it against CFF's schema.
 
 ### What `project_kind` selects
 

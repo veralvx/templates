@@ -87,10 +87,10 @@ include = ["/src", "/tests", "/CHANGELOG.md"]
 dev = [
     "basedpyright==1.39.8",
     "coverage==7.17.0", # pytest-cov's, else floating: the coverage gate is its verdict
+    "mutmut==3.8.0",
 {%- if project_kind == "workspace" %}
     "packaging==26.3", # tests/test_workspace.py reads the members' requirements with it
 {%- endif %}
-    "mutmut==3.8.0",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",

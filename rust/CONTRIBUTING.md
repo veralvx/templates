@@ -43,8 +43,9 @@ or, installed yourself:
 - **[Nix](https://nixos.org)** for the last of `just checks`, the flake's
   formatter and checks (`just nix`).
 
-The nightly Miri toolchain and cargo-audit are easy to miss: without them
-`just checks` fails on tooling rather than on anything wrong with your change.
+The nightly Miri toolchain, cargo-audit and cargo-mutants are easy to miss:
+without them `just checks` fails on tooling rather than on anything wrong with
+your change.
 
 ## Setup
 

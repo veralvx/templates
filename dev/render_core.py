@@ -24,6 +24,10 @@ render-check gives, and checks what otherwise surfaces only after generation:
     (Cargo.lock too), YAML, JSON (flake.lock too; dprint.json's whole-line comments allowed) and,
     with `nix-instantiate` on PATH, Nix.
 
+And `citation`, a case rule every template's render-check adds: CITATION.cff only where a
+citation is asked, holding its answers -- the author's parts, the licence, the keywords, the
+repository.
+
 Then the template's own checks, each on its own: one failing, or unable to run because a file
 before it did not render, is reported and the rest still run; the exit status is 1.
 

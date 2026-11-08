@@ -1,9 +1,10 @@
 # The root flake's formatter (`nix fmt`: nixfmt, shfmt, just's own), then its checks (flake.nix):
 # the format, the shell (`just shell-check template-shell-check`: shellcheck and shfmt, the root's
-# and every template's, the justfiles' script recipes too), the workflows (`just actionlint
-# zizmor`) and the local links (`just links --offline`) -- `just nix`, step by step. The checks are the same on every system, so one runner builds them;
-# every system is evaluated. The lock as committed: a stale one fails each step, where Nix would
-# otherwise rewrite it here unseen and check what nothing locked.
+# and every template's, the justfiles' script recipes too), the workflows (`just actionlint zizmor`)
+# and the local links (`just links --offline`) -- `just nix`, step by step. The checks are the same
+# on every system, so one runner builds them; every system is evaluated. The lock as committed: a
+# stale one fails each step, where Nix would otherwise rewrite it here unseen and check what nothing
+# locked.
 name: Nix
 
 on:
