@@ -78,7 +78,7 @@ jobs:
       # as typst-<version>, the name `just floor` runs; first, so the flake's tools, added to PATH
       # after it, hold the `typst` named so
       - name: Install the oldest Typst
-        uses: typst-community/setup-typst@fee4b65b091cc546f02ce3be15fad8760f38a108 # v5.3.0
+        uses: typst-community/setup-typst@6a2cfaf0b28d636b00148f965e315bae81079aaa # v5.3.1
         with:
           typst-version: ${{ steps.manifest.outputs.compiler }}
           executable-name: typst-${{ steps.manifest.outputs.compiler }}

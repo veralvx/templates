@@ -169,7 +169,7 @@ jobs:
       # as the generated checks.yml installs them: the oldest Typst first, so the flake's tools,
       # added to PATH after it, hold the `typst` named so
       - name: Install the oldest Typst
-        uses: typst-community/setup-typst@fee4b65b091cc546f02ce3be15fad8760f38a108 # v5.3.0
+        uses: typst-community/setup-typst@6a2cfaf0b28d636b00148f965e315bae81079aaa # v5.3.1
         with:
           typst-version: ${{ steps.generate.outputs.compiler }}
           executable-name: typst-${{ steps.generate.outputs.compiler }}
