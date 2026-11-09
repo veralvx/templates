@@ -30,12 +30,14 @@ codebase.
 
 The shell is held as the code is: shfmt formats it (`.editorconfig` holds its
 style) and it passes ShellCheck -- a justfile script recipe included:
-`just shell-check` reads them out of `just --dump`, and refuses one that
-splices a value into its text (it takes arguments). The Nix is nixfmt's, the
-justfile just's own: `nix fmt` formats the Nix, the shell and the justfile;
-`just fmt` all of it, the code, the Markdown and the TOML too. A script is
-named `*.sh`, a git hook excepted: `.editorconfig` and `nix fmt` reach no
-other. The workflows pass actionlint.
+`just shell-check` reads them out of `just --dump`, and refuses one that splices
+a value into its text (it takes arguments). The Nix is nixfmt's, the justfile
+just's own: `nix fmt` formats the Nix, the shell and the justfile; `just fmt`
+all of it, the code, the Markdown and the TOML too. A script is named `*.sh`, a
+git hook excepted: `.editorconfig` and `nix fmt` reach no other. The workflows
+pass actionlint and zizmor's audit, offline: a finding is fixed, or ignored on
+its line with the reason (`# zizmor: ignore[<audit>]`); dist's `release.yml`,
+which `dist plan` holds as `dist init` writes it, is left out.
 
 ## 2. Denied: anything that panics, aborts or silently truncates
 
@@ -99,9 +101,10 @@ falsifies a comment rewrites it.
 
 [Conventional Commits](https://www.conventionalcommits.org/) are enforced by
 `cog check` locally and in CI. The changelog is generated from the commits
-(`cliff.toml`), so the subject line is user-facing text; `chore`, `ci` and
-`style` commits stay out of it, and `!` or a `BREAKING CHANGE` footer lists a
-commit first:
+(`cliff.toml`), so the subject line is user-facing text; every commit enters it,
+by type -- `chore` and `ci` under Miscellaneous Tasks, `style` under Styling;
+merges, fixups and the release commit aside -- and `!` or a `BREAKING CHANGE`
+footer lists a commit first:
 
 ```
 feat(parser): accept bare keys in section headers
@@ -119,11 +122,13 @@ CI refuses: reword it as `revert: ...`.
 Run `just checks`: the checks CI runs, on the toolchain `rust-toolchain.toml`
 pins (Miri on nightly), the flake's last. CI's Rust jobs (check, test, clippy,
 fmt, docs) run on the latest stable, where a lint newer than the MSRV can still
-fire; the pinned toolchain runs there in the MSRV job (check, test) and in
+fire; the pinned toolchain runs there in the MSRV job (check, test), the mutants
+job (cargo-mutants: every mutant of the code caught by the tests) and in
 `nix.yml`, the flake's formatter and checks -- clippy, rustfmt, rustdoc and the
-tests, the format, the shell and the workflows in the Nix sandbox -- which
-`just nix` runs too. Reporting "done" on a change that has not passed them is
-the one thing that wastes the most time here.
+tests, the format, the shell, the workflows (actionlint, zizmor), the local
+links and the citation, if any, in the Nix sandbox -- which `just nix` runs too.
+Reporting "done" on a change that has not passed them is the one thing that
+wastes the most time here.
 
 If a check fails for reasons unrelated to your change, say so explicitly rather
 than working around it -- a broken check that everyone routes around stops

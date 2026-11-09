@@ -1,5 +1,10 @@
 # cargo's build output
 /target
+# cargo-mutants' reports (`just mutants`)
+/mutants.out
+/mutants.out.old
+# lychee's cache (`just links`)
+/.lycheecache
 # `nix build`'s result links, and direnv's cache for `use flake`
 /result*
 /.direnv

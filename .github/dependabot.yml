@@ -1,13 +1,14 @@
 # This repository's actions (`/`, read as .github/workflows), the originals `just sync` copies
-# (shared/root/.github/workflows) and each template's, which a generated project starts from
-# (copied verbatim, so an update there is safe). Any directory but `/` is read as the YAML files
-# directly in it (dependabot-core's github_actions file fetcher), so each folder is named, and
-# `just sync --check` holds the list to the folders of workflows there are (a template added is a
-# line here). No glob: `/*/.github/workflows` reads the root's twice (as `./.github/workflows`)
-# and misses shared/root's. One entry, grouped, version and security updates alike: one pull
-# request across every directory (dependabot-core's compile_all_dependency_changes_for_directories;
-# a security update in no group changes one directory alone) -- `just sync --check` holds each
-# original and its copies equal, so they must move together, or the pull request would not pass.
+# (shared/root/.github/workflows and shared/template/.github/workflows) and each template's, which a
+# generated project starts from (copied verbatim, so an update there is safe). Any directory but `/`
+# is read as the YAML files directly in it (dependabot-core's github_actions file fetcher), so each
+# folder is named, and `just sync --check` holds the list to the folders of workflows there are (a
+# template added is a line here). No glob: `/*/.github/workflows` reads the root's twice (as
+# `./.github/workflows`) and misses shared/'s. One entry, grouped, version and security updates
+# alike: one pull request across every directory (dependabot-core's
+# compile_all_dependency_changes_for_directories; a security update in no group changes one
+# directory alone) -- `just sync --check` holds each original and its copies equal, so they must
+# move together, or the pull request would not pass.
 # Its commits are `build(deps)`: a bump changes what a project is generated with, so the changelog
 # lists it.
 # And render-check's Python packages (dev/requirements.txt), whose update render-check checks.
@@ -17,6 +18,7 @@ updates:
     directories:
       - "/"
       - "/shared/root/.github/workflows"
+      - "/shared/template/.github/workflows"
       - "/typst/.github/workflows"
       - "/python/.github/workflows"
       - "/rust/.github/workflows"
@@ -37,7 +39,7 @@ updates:
         patterns:
           - "*"
     cooldown:
-      default-days: 3
+      default-days: 7
 
   - package-ecosystem: "pip"
     directory: "/dev"
@@ -53,4 +55,4 @@ updates:
         patterns:
           - "*"
     cooldown:
-      default-days: 3
+      default-days: 7

@@ -1,0 +1,6 @@
+# cargo-mutants (`just mutants`): the mutants it skips, each a change no test can catch, with why.
+
+exclude_re = [
+    # the binary's main, emptied: no test runs the binary -- one would spawn it, which Miri cannot
+    'src/main\.rs:\d+:\d+: replace main with \(\)$',
+]

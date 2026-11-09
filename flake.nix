@@ -2,14 +2,16 @@
 # flake.nix is that): the tools its maintainers run, and the checks that need no network.
 #
 #   nix develop      the shell: the maintainers' tools -- cargo-generate, just, jq, shellcheck,
-#                    shfmt, actionlint, dprint, cog, git-cliff, nixfmt, Python for render-check
-#                    and sync; a project's own are its flake's (`just smoke` runs each there)
+#                    shfmt, actionlint, zizmor, lychee, dprint, cog, git-cliff, nixfmt, Python
+#                    for render-check and sync; a project's own are its flake's (`just smoke`
+#                    runs each there)
 #   nix fmt          the formatter: nixfmt, shfmt (as .editorconfig says) and just's own, through
 #                    treefmt; `nix fmt -- --ci` (`just nix`) formats, and fails if that changed a
 #                    file
 #   nix flake check  the format (the formatter's verdict), the shell (`just shell-check
-#                    template-shell-check`: the root's and every template's) and the workflows
-#                    (`just actionlint`), offline in the sandbox
+#                    template-shell-check`: the root's and every template's), the workflows
+#                    (`just actionlint zizmor`) and the local links (`just links --offline`),
+#                    offline in the sandbox
 #
 # flake.lock is typst/flake.lock: one original, shared/root/flake.lock, copied to both by `just
 # sync` (`just sync --check` holds them), so the tools here are at a typst project's versions, and
@@ -122,7 +124,21 @@
             # the formatter's verdict on the whole tree: what `nix fmt` would change fails it
             format = formatter.check ./.;
             shell = onCopy "shell" shellTools "just shell-check template-shell-check";
-            workflows = onCopy "workflows" (shellTools ++ [ pkgs.actionlint ]) "just actionlint";
+            workflows = onCopy "workflows" (
+              shellTools
+              ++ [
+                pkgs.actionlint
+                pkgs.zizmor
+              ]
+            ) "just actionlint zizmor";
+            # cacert: lychee builds its HTTP client, which loads a CA bundle, offline too
+            links = onCopy "links" (
+              shellTools
+              ++ [
+                pkgs.lychee
+                pkgs.cacert
+              ]
+            ) "just links --offline";
           };
 
           devShells.default = pkgs.mkShell {
@@ -133,6 +149,8 @@
               pkgs.shellcheck
               pkgs.shfmt
               pkgs.actionlint
+              pkgs.zizmor
+              pkgs.lychee
               pkgs.dprint
               pkgs.cocogitto
               pkgs.git-cliff

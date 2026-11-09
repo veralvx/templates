@@ -147,6 +147,8 @@ jobs:
           fetch-depth: 0
           filter: tree:0
           sparse-checkout: packages/preview/${{ needs.bundle.outputs.name }}
+          # kept: the partial clone fetches what it lacks, and the branch is pushed, with it
+          persist-credentials: true
 
       - name: The bundle
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

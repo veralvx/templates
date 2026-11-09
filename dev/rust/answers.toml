@@ -12,3 +12,7 @@ license = "MIT OR Apache-2.0"
 msrv = "1.97"
 keywords = "cli,parser"
 categories = "command-line-utilities"
+citation = true
+family_names = "Doe"
+given_names = "Jane"
+orcid = "0000-0002-1825-0097"

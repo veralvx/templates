@@ -1,3 +1,8 @@
+# Every text file LF, as checked out on Windows too (core.autocrlf): a CRLF shebang does not run,
+# and the formatters (shfmt, nixfmt, dprint, just's own) write LF, so their checks would refuse
+# every line.
+* text=auto eol=lf
+
 # What typst/packages does not get: `just bundle` is `git archive`, which leaves out what is marked
 # export-ignore here -- the tooling, the tests and the contributors' documents. What remains is the
 # package: typst.toml, src/, template/ (a template package's), README.md, the licences, the
@@ -10,6 +15,7 @@
 /.github export-ignore
 /tests export-ignore
 /AGENTS.md export-ignore
+/CITATION.cff export-ignore
 /CODE_OF_CONDUCT.md export-ignore
 /CONTRIBUTING.md export-ignore
 /SECURITY.md export-ignore
@@ -19,3 +25,4 @@
 /flake.lock export-ignore
 /flake.nix export-ignore
 /justfile export-ignore
+/lychee.toml export-ignore

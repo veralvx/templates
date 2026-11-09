@@ -18,7 +18,7 @@ import tomllib
 from collections.abc import Mapping
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
-from render_core import IMAGE_LABELS, Case, Check, image_answer, image_wanted, run  # noqa: E402 - dev/, put on the path above
+from render_core import CITATIONS, IMAGE_LABELS, Case, Check, citation, citation_label, image_answer, image_wanted, run  # noqa: E402 - dev/, put on the path above
 
 SINGLE = "src/{{crate_name}}"
 CLI = "packages/{{project-name}}"
@@ -40,13 +40,14 @@ PYTHONS = ("3.12", "3.13", "3.14", "3.15")
 # each kind's container_image answers (render_core's IMAGE_LABELS)
 IMAGES = {"bin": (True, False), "lib": (None, True), "workspace": (True, False)}
 CASES = [
-    {"project_kind": kind, "license": lic, "python_min": py, **extra}
+    {"project_kind": kind, "license": lic, "python_min": py, **extra, **cited}
     | image_answer(image)
     for kind in ("bin", "lib", "workspace")
     for image in IMAGES[kind]
     for lic in ("MIT OR Apache-2.0", "MIT", "Apache-2.0")
     for py in PYTHONS
     for extra in ({}, {"author_email": "", "keywords": ""})
+    for cited in CITATIONS
 ]
 
 
@@ -55,6 +56,7 @@ def label(case: Mapping[str, object]) -> str:
         f"{case['project_kind']}/{case['license']}/{case['python_min']}"
         + ("/bare" if case.get("author_email") == "" else "")
         + IMAGE_LABELS[case.get("container_image")]
+        + citation_label(case)
     )
 
 
@@ -185,6 +187,6 @@ if __name__ == "__main__":
             cases=CASES,
             label=label,
             rules=(pythons, duplicated_code, member_licences),
-            case_rules=(floors, manifests, layout),
+            case_rules=(floors, manifests, layout, citation),
         )
     )

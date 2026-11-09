@@ -1,0 +1,4 @@
+# Every text file LF, as checked out on Windows too (core.autocrlf): a CRLF shebang does not run,
+# and the formatters (shfmt, nixfmt, dprint, just's own) write LF, so their checks would refuse
+# every line.
+* text=auto eol=lf

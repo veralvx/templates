@@ -26,7 +26,7 @@ from collections.abc import Mapping
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from lock_core import NIX_FLAGS, get_flake  # noqa: E402 - dev/, put on the path above
-from render_core import Case, Check, case_vars, run  # noqa: E402 - dev/, put on the path above
+from render_core import CITATIONS, Case, Check, case_vars, citation, citation_label, run  # noqa: E402 - dev/, put on the path above
 
 # typst/packages' lists (docs/CATEGORIES.md, docs/DISCIPLINES.md; bundler/src/*.rs)
 CATEGORIES = (
@@ -66,6 +66,7 @@ CASES = [
         "description": "Does a thing well enough to say so.",
         "categories": cats,
         **extra,
+        **cited,
     }
     for kind, cat_choices in (
         ("package", ("", "utility, scripting")),
@@ -74,12 +75,15 @@ CASES = [
     for cats in cat_choices
     for lic in LICENCES
     for extra in (FULL, EMPTY)
+    for cited in CITATIONS
 ]
 
 
 def label(case: Mapping[str, object]) -> str:
-    return f"{case['project_kind']}/{case['license']}/[{case['categories']}]" + (
-        "/empty" if case["keywords"] == "" else ""
+    return (
+        f"{case['project_kind']}/{case['license']}/[{case['categories']}]"
+        + ("/empty" if case["keywords"] == "" else "")
+        + citation_label(case)
     )
 
 
@@ -123,7 +127,8 @@ def export_ignore(check: Check) -> None:
     """.gitattributes' export-ignore paths exist (a stale one is dead weight), none the package."""
     print("== export-ignore paths")
     for line in check.texts[".gitattributes"].splitlines():
-        if not line.strip() or line.startswith("#"):
+        # the line ends every repository's is (shared/root/.gitattributes)
+        if not line.strip() or line.startswith("#") or line == "* text=auto eol=lf":
             continue
         path, *attributes = line.split()
         if attributes != ["export-ignore"] or not path.startswith("/"):
@@ -243,6 +248,6 @@ if __name__ == "__main__":
             cases=CASES,
             label=label,
             rules=(universe_regexes, export_ignore, licence_copies, compiler_cap),
-            case_rules=(manifest, entrypoint, licence_files),
+            case_rules=(manifest, entrypoint, licence_files, citation),
         )
     )

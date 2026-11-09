@@ -1,6 +1,6 @@
 #!/bin/sh
-# Formatting (rustfmt, dprint), the shell and the workflows only, so a commit
-# stays fast: clippy, the tests and the rest are `just checks` and CI. Checks
-# the working tree, not just what is staged.
+# Formatting (rustfmt, dprint), the shell and the workflows (actionlint and
+# zizmor) only, so a commit stays fast: clippy, the tests and the rest are
+# `just checks` and CI. Checks the working tree, not just what is staged.
 set -eu
-just fmt-check shell-check actionlint dprint-check
+just fmt-check shell-check actionlint zizmor dprint-check

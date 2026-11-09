@@ -1,0 +1,35 @@
+# The links of the files git tracks but the template roots' (`just links`, lychee), online: monthly
+# and on demand, as a page moves or goes with nothing changed here. Pull requests check the local
+# ones alone, offline (nix.yml: the flake's `links` check). The job's token, lychee's alone, so
+# GitHub's links are not rate-limited.
+name: Links
+
+on:
+  schedule:
+    - cron: "47 4 1 * *" # the 1st of each month, 04:47 UTC: off the hour, when GitHub delays runs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: lychee
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+
+      # the root lock's, the dev shell's
+      - name: Install just and lychee
+        run: dev/nix-tools.sh . just lychee
+
+      - name: just links
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: just links

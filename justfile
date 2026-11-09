@@ -383,6 +383,45 @@ actionlint:
     done
     exit "$failed"
 
+# zizmor, offline -- an audit that would ask GitHub is skipped, so the verdict is the same on any
+# connection -- and failing, not warning, on a file it cannot read: this repository's .github (its
+# workflows and Dependabot's configuration) and each template root's workflows, copied verbatim. A
+# template's dependabot.yml can hold Liquid (rust's): the generated project's `just zizmor` audits
+# it, in the smoke test.
+[doc("The workflows' security audited (zizmor): this repository's, its Dependabot's and every template's")]
+zizmor:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s nullglob
+    inputs=(.github)
+    for config in */cargo-generate.toml; do
+        workflows="${config%/*}/.github/workflows"
+        if [ -d "$workflows" ]; then inputs+=("$workflows"); fi
+    done
+    zizmor --offline --strict-collection --quiet "${inputs[@]}"
+
+# lychee over the files git does not ignore, but the template roots' and shared/template/'s (Liquid:
+# a generated project checks its own, rendered), as lychee.toml says. Online, each link fetched
+# (links.yml, monthly); `just links --offline` checks the local ones alone, `just checks`'s: the
+# same verdict on any connection. A GITHUB_TOKEN in the environment spares GitHub's rate limit.
+[doc("The links checked (lychee): just links [--offline], every file git tracks but a template's")]
+[positional-arguments]
+links *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # a process substitution's failure goes unseen (set -e): outside a repository, ls-files' would
+    git rev-parse --is-inside-work-tree > /dev/null
+    shopt -s nullglob
+    outside=(':!shared/template')
+    for config in */cargo-generate.toml; do
+        outside+=(":!${config%/*}")
+    done
+    files=()
+    while IFS= read -r -d '' file; do
+        if [ -f "$file" ]; then files+=("$file"); fi
+    done < <(git ls-files -z --cached --others --exclude-standard -- . "${outside[@]}")
+    lychee --no-progress "$@" -- "${files[@]}"
+
 # Every formatter a check holds the files to: the shell (the templates' too), the justfiles, the
 # Markdown and the TOML (each template root's are a generated project's), then the Nix through
 # `nix fmt` (nixfmt, and shfmt and just's own again) -- without Nix, it stops there, the rest
@@ -460,7 +499,7 @@ nix:
 # only: a new file is invisible to it until `git add`ed. `just smoke <template> <kind>` is the
 # smoke test's, and slow.
 [doc("Every check but the smoke test, the flake's last")]
-checks: render-check (sync "--check") tool-versions-check shell-check template-shell-check actionlint dprint-check cog nix
+checks: render-check (sync "--check") tool-versions-check shell-check template-shell-check actionlint zizmor (links "--offline") dprint-check cog nix
 
 # Opt-in, as every git hook is: a clone never installs one, so CI stays the gate.
 # `git config --unset core.hooksPath` turns them off again.

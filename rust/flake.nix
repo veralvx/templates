@@ -2,14 +2,17 @@
 # file, so the MSRV is written once and rustup and Nix build with the same compiler -- the
 # tools `just checks` and `just release` run, and CI's checks as derivations.
 #
-#   nix develop          the shell: the toolchain, just, dprint, cog, git-cliff, cargo-audit...
+#   nix develop          the shell: the toolchain, just, dprint, cog, git-cliff, cargo-audit,
+#                        cargo-mutants, zizmor, lychee...
 #   nix develop .#miri   nightly with Miri (`just miri` enters it on its own)
 #   nix fmt              nixfmt, shfmt (as .editorconfig says) and just's own, through
 #                        treefmt; `nix fmt -- --ci` (`just nix`) formats, and fails if that
 #                        changed a file
 #   nix flake check      clippy, rustfmt, rustdoc and the tests, the format (`nix fmt`'s
-#                        verdict), the shell (`just shell-check`) and the workflows
-#                        (actionlint), offline in the sandbox
+#                        verdict), the shell (`just shell-check`), the workflows
+#                        (actionlint, `just zizmor`), the local links (`just links
+#                        --offline`) and CITATION.cff where there is one (its schema),
+#                        offline in the sandbox
 {%- if project_kind != "lib" %}
 #                        -- and the pins: dist-workspace.toml's cargo-dist-version, the
 #                        shell's dist (`just pins-update` moves it)
@@ -61,11 +64,14 @@
         fileset = lib.fileset.difference ./. (
           lib.fileset.unions (
             map lib.fileset.maybeMissing [
+              ./.cargo/mutants.toml
+              ./.gitattributes
               ./.githooks
               ./.github
               ./.gitignore
               ./AGENTS.md
               ./CHANGELOG.md
+              ./CITATION.cff
               ./CODE_OF_CONDUCT.md
               ./CONTRIBUTING.md
               ./SECURITY.md
@@ -76,6 +82,7 @@
               ./flake.lock
               ./flake.nix
               ./justfile
+              ./lychee.toml
             ]
           )
         );
@@ -245,15 +252,18 @@
                   just shell-check
                   touch $out
                 '';
-            # actionlint on a copy, in a repository of its own, as `just actionlint` runs it: with
-            # no file named, actionlint finds the workflows, and .github/actionlint.yaml if there is
-            # one, from the repository's root
+            # actionlint and zizmor on a copy, in a repository of its own, as `just actionlint
+            # zizmor` runs them: with no file named, actionlint finds the workflows, and
+            # .github/actionlint.yaml if there is one, from the repository's root; zizmor's script
+            # recipe has its bash named by its path, as above
             workflows =
               pkgs.runCommand "workflows"
                 {
                   nativeBuildInputs = [
+                    pkgs.just
                     pkgs.actionlint
                     pkgs.shellcheck
+                    pkgs.zizmor
                     pkgs.gitMinimal
                   ];
                 }
@@ -262,8 +272,35 @@
                   chmod -R u+w "$TMPDIR/project"
                   cd "$TMPDIR/project"
                   export HOME="$TMPDIR"
+                  substituteInPlace justfile \
+                    --replace-fail '#!/usr/bin/env bash' '#!${pkgs.bash}/bin/bash'
                   git init --quiet
-                  actionlint
+                  just actionlint zizmor
+                  touch $out
+                '';
+            # `just links --offline` on a copy, in a repository of its own: it lists the files git
+            # does not ignore; its script recipe's bash named by its path, as above
+            links =
+              pkgs.runCommand "links"
+                {
+                  nativeBuildInputs = [
+                    pkgs.just
+                    pkgs.gitMinimal
+                    pkgs.lychee
+                    # lychee builds its HTTP client, which loads a CA bundle, offline too
+                    pkgs.cacert
+                  ];
+                }
+                ''
+                  cp -r ${./.} "$TMPDIR/project"
+                  chmod -R u+w "$TMPDIR/project"
+                  cd "$TMPDIR/project"
+                  export HOME="$TMPDIR"
+                  substituteInPlace justfile \
+                    --replace-fail '#!/usr/bin/env bash' '#!${pkgs.bash}/bin/bash'
+                  git init --quiet
+                  git add --all
+                  just links --offline
                   touch $out
                 '';
 {%- if project_kind != "lib" %}
@@ -295,6 +332,14 @@
             inherit package;
 {%- endif %}
           }
+          // lib.optionalAttrs (builtins.pathExists ./CITATION.cff) {
+            # CFF's schema alone: Zenodo's import refuses more (a licence list), which its
+            # comments name
+            citation = pkgs.runCommand "citation" { nativeBuildInputs = [ pkgs.cffconvert ]; } ''
+              cffconvert --validate --infile ${./CITATION.cff}
+              touch $out
+            '';
+          }
 {%- if project_kind != "lib" and container_image %}
           # the image built: its layers, from the binary's closure
           // linux
@@ -309,9 +354,12 @@
                 pkgs.cocogitto
                 pkgs.git-cliff
                 pkgs.cargo-audit
+                pkgs.cargo-mutants
                 pkgs.shellcheck
                 pkgs.shfmt
                 pkgs.actionlint
+                pkgs.zizmor
+                pkgs.lychee
 {%- if project_kind != "lib" %}
                 pkgs.cargo-dist
 {%- endif %}

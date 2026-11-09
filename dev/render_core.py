@@ -24,6 +24,10 @@ render-check gives, and checks what otherwise surfaces only after generation:
     (Cargo.lock too), YAML, JSON (flake.lock too; dprint.json's whole-line comments allowed) and,
     with `nix-instantiate` on PATH, Nix.
 
+And `citation`, a case rule every template's render-check adds: CITATION.cff only where a
+citation is asked, holding its answers -- the author's parts, the licence, the keywords, the
+repository.
+
 Then the template's own checks, each on its own: one failing, or unable to run because a file
 before it did not render, is reported and the rest still run; the exit status is 1.
 
@@ -106,6 +110,54 @@ LITERAL = re.compile(r"\"[^\"]*\"|'[^']*'")
 # a `{% %}` tag's name: its first word, to the first character no name holds (`if(x)`)
 TAG_NAME = re.compile(r"#?[A-Za-z_]*")
 FILTER_NAME = re.compile(r"^\s*[A-Za-z_][\w-]*")
+
+
+# the citation's answers, every template's: none (no CITATION.cff), each value given, or the family
+# names alone -- a particle and spaces in them, as Zenodo takes them
+CITATIONS: tuple[dict[str, object], ...] = (
+    {"citation": False},
+    {"citation": True, "family_names": "Doe", "given_names": "Jane", "orcid": "0000-0002-1825-0097"},
+    {"citation": True, "family_names": "van der Berg", "given_names": "", "orcid": ""},
+)
+
+
+def citation_label(case: Mapping[str, object]) -> str:
+    """A case's citation, in its label: none, or the values it gives."""
+    if not case.get("citation"):
+        return ""
+    return "/cited" if case.get("given_names") else "/cited-bare"
+
+
+def citation(check: Check, case: Case) -> None:
+    """CITATION.cff is a citation's alone, and holds its answers: the author's parts, the licence
+    (an OR as CFF's list), the keywords, the repository."""
+    rel = "CITATION.cff"
+    vars_ = case.vars
+    if (rel in case.kept) != (vars_.get("citation") is True):
+        check.fail(f"{case.label}: {rel} present={rel in case.kept}, citation={vars_.get('citation')}")
+        return
+    if rel not in case.kept:
+        return
+    cff = yaml.safe_load(case.outputs[rel])
+    author = {"family-names": vars_["family_names"]}
+    if vars_["given_names"]:
+        author["given-names"] = vars_["given_names"]
+    if vars_["author_email"]:
+        author["email"] = vars_["author_email"]
+    if vars_["orcid"]:
+        author["orcid"] = f"https://orcid.org/{vars_['orcid']}"
+    if cff.get("authors") != [author]:
+        check.fail(f"{case.label}: {rel}'s authors are {cff.get('authors')!r}, expected [{author!r}]")
+    licence = vars_["license"]
+    wanted: object = licence.split(" OR ") if " OR " in licence else licence
+    if cff.get("license") != wanted:
+        check.fail(f"{case.label}: {rel}'s license is {cff.get('license')!r}, expected {wanted!r}")
+    keywords = [k.strip() for k in str(vars_["keywords"]).split(",") if k.strip()]
+    if cff.get("keywords", []) != keywords:
+        check.fail(f"{case.label}: {rel}'s keywords are {cff.get('keywords')!r}, expected {keywords!r}")
+    repository = f"https://github.com/{vars_['github_username']}/{vars_['project-name']}"
+    if (cff.get("title"), cff.get("repository-code")) != (vars_["project-name"], repository):
+        check.fail(f"{case.label}: {rel}'s title or repository-code is not the project's")
 
 
 def image_answer(image: bool | None) -> dict[str, object]:
@@ -290,11 +342,12 @@ FinalRule = Callable[[Check, list[Case]], object]
 
 
 def kind(rel: str) -> str | None:
-    """What a file parses as: toml, yaml, json, jsonc (dprint.json: whole-line comments), nix."""
+    """What a file parses as: toml, yaml (CITATION.cff too), json, jsonc (dprint.json: whole-line
+    comments), nix."""
     path = pathlib.PurePath(rel)
     if path.suffix == ".toml" or path.name == "Cargo.lock":
         return "toml"
-    if path.suffix in (".yml", ".yaml"):
+    if path.suffix in (".yml", ".yaml", ".cff"):
         return "yaml"
     if path.name == "dprint.json":
         return "jsonc"

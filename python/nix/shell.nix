@@ -18,6 +18,8 @@ pkgs.mkShell {
     pkgs.shellcheck
     pkgs.shfmt
     pkgs.actionlint
+    pkgs.zizmor
+    pkgs.lychee
     pkgs.jq
   ];
   env = {

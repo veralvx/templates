@@ -86,6 +86,32 @@ type = "bool"
 prompt = "Build the command as an OCI image too (the flake's `image`, published to GHCR by image.yml)?"
 default = true
 
+# A citation file is opt-in: a project not meant to be cited has none. Its author is asked by
+# parts, as Zenodo's import takes them: no comma, which it reads as the family names' end. An ORCID
+# iD's check digit is Zenodo's to verify.
+[placeholders.citation]
+type = "bool"
+prompt = "A citation file, CITATION.cff (GitHub's \"Cite this repository\", Zenodo's archive)?"
+default = false
+
+[conditional.'citation'.placeholders.family_names]
+type = "string"
+prompt = "Family names, CITATION.cff's (Zenodo refuses an author without them)"
+# it lands in a YAML string: a `"` or `\` would end or escape it
+regex = '^[^\s",\\](?:[^",\\]*[^\s",\\])?$'
+
+[conditional.'citation'.placeholders.given_names]
+type = "string"
+prompt = "Given names, CITATION.cff's (leave empty to omit them)"
+default = ""
+regex = '^$|^[^\s",\\](?:[^",\\]*[^\s",\\])?$'
+
+[conditional.'citation'.placeholders.orcid]
+type = "string"
+prompt = "ORCID iD, CITATION.cff's: 0000-0002-1825-0097 (leave empty to omit it)"
+default = ""
+regex = '^$|^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$'
+
 # --- conditional file selection ----------------------------------------------------------------
 #
 # NOTE: `ignore` entries are literal paths relative to the template root, NOT globs -- a glob
@@ -134,3 +160,7 @@ ignore = ["nix/image.nix", ".github/workflows/image.yml", ".github/image-registr
 # workspace as a whole.
 [conditional.'project_kind == "workspace"']
 ignore = ["src", "tests/test_{{crate_name}}.py", "tests/test_cli.py"]
+
+# No citation: no CITATION.cff.
+[conditional.'!citation']
+ignore = ["CITATION.cff"]

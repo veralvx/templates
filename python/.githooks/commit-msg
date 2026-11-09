@@ -1,12 +1,18 @@
 #!/bin/sh
 # The message, as CI's Conventional Commits check will read it -- a merge
 # commit's excepted, as CI excepts it (cog.toml's ignore_merge_commits).
+# `cog verify` takes a message starting "Merge" for a merge's; pre-push checks
+# what it cannot tell, a merge by its parents.
 set -eu
 if git rev-parse -q --verify MERGE_HEAD > /dev/null; then exit 0; fi
-# `cog verify` reads the author from git's config -- GIT_AUTHOR_NAME and the like are not
-# config -- and panics without it (cocogitto 7.0.0)
-if ! git config user.name > /dev/null || ! git config user.email > /dev/null; then
-  echo "commit-msg: cog verify needs git's user.name and user.email (git config)" >&2
+# `cog verify` reads the author from git's config files, as libgit2 does -- not
+# git -c's, GIT_CONFIG's, GIT_CONFIG_GLOBAL's or GIT_AUTHOR_NAME's -- and panics
+# without it: the identity checked as it reads it
+if ! (
+  unset GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM GIT_CONFIG_NOSYSTEM
+  git config user.name && git config user.email
+) > /dev/null; then
+  echo "commit-msg: cog verify needs user.name and user.email in git's config files, not git -c's" >&2
   exit 1
 fi
 cog verify --file "$1"

@@ -11,6 +11,11 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .hypothesis/
+# mutmut's mutants and their results (`just mutation`): the root's, or each member's
+/mutants/
+/packages/*/mutants/
+# lychee's cache (`just links`)
+/.lycheecache
 # Nix's build links, direnv's cache
 /result*
 /.direnv

@@ -36,7 +36,7 @@ A change to a template is judged by what it generates, never by its text alone: 
   images); typst's hooks, flake and lock, starter code and tests; python's hooks and `nix/`; rust's
   lock. An excluded file holds no placeholder: render-check refuses one.
 - **Every answer combination renders and parses.** render-check renders each templated file for each
-  template's answer combinations (typst's 32, python's 108, rust's 48) and parses the TOML, YAML,
+  template's answer combinations (typst's 96, python's 432, rust's 144) and parses the TOML, YAML,
   JSON and, with `nix-instantiate` on `PATH`, Nix; whitespace is the smoke test's, as python-liquid
   trims one newline liquid-rust keeps.
 
@@ -61,9 +61,11 @@ script recipe included: `just shell-check` reads them out of `just --dump`, and 
 splices a value into its text (it takes arguments). The Nix is nixfmt's, the justfiles just's own
 (`nix fmt` formats the three); the Markdown and TOML, dprint's; `just format` runs them all, over
 the templates' shell and justfiles too (their Markdown and TOML hold Liquid: a generated project
-formats its own). The workflows pass actionlint. Actions are pinned to a full commit SHA, the
-version in a comment, as Dependabot keeps them (`just tool-versions-check` refuses a tag or a
-branch).
+formats its own). The workflows pass actionlint and zizmor's audit, offline (`just zizmor`): a
+finding is fixed, or ignored on its line with the reason (`# zizmor: ignore[<audit>]`). The links
+resolve (`just links`, lychee; `just checks` the local ones, offline). Actions are pinned to a full
+commit SHA, the version in a comment, as Dependabot keeps them (`just tool-versions-check` refuses a
+tag or a branch).
 
 ## 5. Comments: only what is essential
 
@@ -73,12 +75,13 @@ that is noise, and it goes stale. A change that falsifies a comment rewrites it.
 
 ## 6. Commits
 
-[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally
-and in CI. The changelog is generated from the commits (`cliff.toml`), each entry showing its
-scope, so the subject line is what a template user reads; `chore`, `ci` and `style` commits stay
-out of it, and `!` or a `BREAKING CHANGE` footer -- a prompt renamed, a file a generated project no
-longer has -- lists a commit first. A template's commit takes its name as scope; one touching
-several names each; `shared` and `dev` are the shared files' and the tooling's:
+[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally and
+in CI. The changelog is generated from the commits (`cliff.toml`), each entry showing its scope, so
+the subject line is what a template user reads; every commit enters it, by type -- `chore` and `ci`
+under Miscellaneous Tasks, `style` under Styling; merges, fixups and the release commit aside -- and
+`!` or a `BREAKING CHANGE` footer -- a prompt renamed, a file a generated project no longer has --
+lists a commit first. A template's commit takes its name as scope; one touching several names each;
+`shared` and `dev` are the shared files' and the tooling's:
 
 ```text
 feat(typst): ask for the package's disciplines
@@ -95,10 +98,11 @@ with `--no-verify`. `git revert` writes `Revert "..."`, which CI refuses: reword
 ## 7. Before you claim a change is done
 
 Run `just checks` -- every render-check, `just sync --check`, no tool version by hand, the shell,
-the workflows, dprint, the commit messages and the flake -- and, for a change to a template, `just
-smoke <template> <kind>` for each of its kinds. Together they are what CI runs, but the smoke tests'
-releases, their other jobs and their Nix builds: CI's. Reporting "done" on a change that has not
-passed them is the one thing that wastes the most time here.
+the workflows (actionlint, zizmor), the local links, dprint, the commit messages and the flake --
+and, for a change to a template, `just smoke <template> <kind>` for each of its kinds. Together they
+are what CI runs, but the smoke tests' releases, their other jobs and their Nix builds: CI's.
+Reporting "done" on a change that has not passed them is the one thing that wastes the most time
+here.
 
 If a check fails for reasons unrelated to your change, say so explicitly rather than working
 around it -- a broken check that everyone routes around stops protecting anything.

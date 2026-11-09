@@ -1,4 +1,4 @@
-name: Rust CI (check, test, clippy, fmt, docs, miri)
+name: Rust CI (check, test, clippy, fmt, docs, miri, mutants)
 
 # No job names the project: what one needs to know of it, it reads at run
 # time, as the MSRV job does below.
@@ -6,9 +6,10 @@ name: Rust CI (check, test, clippy, fmt, docs, miri)
 # Toolchains: rust-toolchain.toml pins the MSRV, and rustup obeys that file
 # over the default a toolchain action sets -- so the jobs meant for the
 # latest stable say so with RUSTUP_TOOLCHAIN (which outranks the file), and
-# the MSRV job is the one that builds with the pinned toolchain. Actions are
-# pinned to commits (Dependabot moves them); dtolnay/rust-toolchain is pinned
-# to a commit of its master branch and told the toolchain.
+# the MSRV job builds with the pinned toolchain, as the mutants job does in
+# the flake's dev shell. Actions are pinned to commits (Dependabot moves
+# them); dtolnay/rust-toolchain is pinned to a commit of its master branch and
+# told the toolchain.
 
 on:
   push:
@@ -18,6 +19,7 @@ on:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
       - ".cargo/config.toml"
+      - ".cargo/mutants.toml"
       - "clippy.toml"
       - "rustfmt.toml"
       - "rust-toolchain.toml"
@@ -51,6 +53,8 @@ jobs:
         features: ["--all-features"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install stable
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
@@ -76,6 +80,8 @@ jobs:
         features: ["--all-features"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install stable
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
@@ -120,6 +126,8 @@ jobs:
         features: ["--all-features"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install nightly + miri
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
@@ -140,6 +148,22 @@ jobs:
       - name: cargo miri test
         run: cargo +nightly miri test --workspace --locked --verbose ${{ matrix.features }}
 
+  # cargo-mutants in the dev shell (the flake's, at flake.lock's version): the toolchain
+  # rust-toolchain.toml pins, `just checks`'s
+  mutants:
+    name: Mutants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+
+      - name: just mutants
+        run: nix develop --command just mutants
+
   clippy:
     name: Clippy (${{ matrix.features }})
     runs-on: ubuntu-latest
@@ -151,6 +175,8 @@ jobs:
         features: ["--all-features"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install stable + clippy
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
@@ -171,6 +197,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The version is read from Cargo.toml rather than pinned here, so
       # `rust-version` stays the single source of truth. A pin in this
@@ -219,6 +247,8 @@ jobs:
       RUSTUP_TOOLCHAIN: stable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install stable + rustfmt
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
@@ -236,6 +266,8 @@ jobs:
       RUSTUP_TOOLCHAIN: stable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install stable
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master

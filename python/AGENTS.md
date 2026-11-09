@@ -18,12 +18,13 @@ leaves out every rule written after the list was made.
 **Never add a blanket ignore to silence a new rule.** Either fix the site, or add the ignore to
 `pyproject.toml` with a comment saying why the rule is wrong for this codebase.
 
-The shell is held as the code is: shfmt formats it (`.editorconfig` holds its style) and it
-passes ShellCheck -- a justfile script recipe included: `just shell-check` reads them out of
-`just --dump`, and refuses one that splices a value into its text (it takes arguments). The Nix
-is nixfmt's, the justfile just's own: `nix fmt` formats the Nix, the shell and the justfile;
-`just format` all of it, the code, the Markdown and the TOML too. A script is named `*.sh`, a git
-hook excepted: `.editorconfig` and `nix fmt` reach no other. The workflows pass actionlint.
+The shell is held as the code is: shfmt formats it (`.editorconfig` holds its style) and it passes
+ShellCheck -- a justfile script recipe included: `just shell-check` reads them out of `just --dump`,
+and refuses one that splices a value into its text (it takes arguments). The Nix is nixfmt's, the
+justfile just's own: `nix fmt` formats the Nix, the shell and the justfile; `just format` all of it,
+the code, the Markdown and the TOML too. A script is named `*.sh`, a git hook excepted:
+`.editorconfig` and `nix fmt` reach no other. The workflows pass actionlint and zizmor's audit,
+offline: a finding is fixed, or ignored on its line with the reason (`# zizmor: ignore[<audit>]`).
 
 ## 2. Types: no `Any`
 
@@ -81,10 +82,11 @@ that is noise, and it goes stale. A change that falsifies a comment rewrites it.
 
 ## 5. Commits
 
-[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally
-and in CI. The changelog is generated from the commits (`cliff.toml`), so the subject line is
-user-facing text; `chore`, `ci` and `style` commits stay out of it, and `!` or a
-`BREAKING CHANGE` footer lists a commit first:
+[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally and
+in CI. The changelog is generated from the commits (`cliff.toml`), so the subject line is
+user-facing text; every commit enters it, by type -- `chore` and `ci` under Miscellaneous Tasks,
+`style` under Styling; merges, fixups and the release commit aside -- and `!` or a `BREAKING CHANGE`
+footer lists a commit first:
 
 ```
 {% if project_kind == "lib" %}feat: accept the name as bytes too{% else %}feat(cli): accept the name from standard input{% endif %}
@@ -99,11 +101,12 @@ with `--no-verify`. `git revert` writes `Revert "..."`, which CI refuses: reword
 
 ## 6. Before you claim a change is done
 
-Run `just checks`. It is what CI runs: the lock, ruff, the shell, the workflows, the types, dead
-code, the tests with every line and branch covered, dprint, the commit messages, pip-audit, and the
-flake's formatter and checks -- the tests again on each supported Python nixpkgs caches, against the
-built packages, and the types on each. Reporting "done" on a change that has not passed it is the
-one thing that wastes the most time here.
+Run `just checks`. It is what CI runs: the lock, ruff, the shell, the workflows (actionlint,
+zizmor), the local links, the types, dead code, the tests with every line and branch covered, every
+mutant of the code killed by them (mutmut), dprint, the commit messages, pip-audit, and the flake's
+formatter and checks -- the tests again on each supported Python nixpkgs caches, against the built
+packages, and the types on each. Reporting "done" on a change that has not passed it is the one
+thing that wastes the most time here.
 
 If a check fails for reasons unrelated to your change, say so explicitly rather than working
 around it -- a broken check that everyone routes around stops protecting anything.

@@ -43,6 +43,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: The templates this run needs
         id: changes
@@ -56,21 +57,23 @@ jobs:
             dev/changes.sh | tee -a "$GITHUB_OUTPUT"
           fi
 
-  # one job each: a reusable workflow's path takes no expression, so no matrix can name it
+  # one job each: a reusable workflow's path takes no expression, so no matrix can name it; `./`,
+  # not GitHub's newer `$/` (zizmor's self-repository): actionlint, which every workflow passes,
+  # refuses it
   smoke-typst:
     needs: changes
     if: needs.changes.outputs.typst == 'true'
-    uses: ./.github/workflows/smoke-typst.yml
+    uses: ./.github/workflows/smoke-typst.yml # zizmor: ignore[self-repository]
 
   smoke-python:
     needs: changes
     if: needs.changes.outputs.python == 'true'
-    uses: ./.github/workflows/smoke-python.yml
+    uses: ./.github/workflows/smoke-python.yml # zizmor: ignore[self-repository]
 
   smoke-rust:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
-    uses: ./.github/workflows/smoke-rust.yml
+    uses: ./.github/workflows/smoke-rust.yml # zizmor: ignore[self-repository]
 
   smoke-gate:
     name: smoke-gate

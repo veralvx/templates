@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog=NAME, description="Print a greeting.")
     _ = parser.add_argument("--version", action="version", version=f"%(prog)s {version(NAME)}")
     _ = parser.add_argument("name", nargs="?", default="", help="who to greet (default: the world)")
-    arguments = parser.parse_args(argv, namespace=_Arguments())
+    # the namespace only types the result: argparse's default, a mutant's, parses the same
+    arguments = parser.parse_args(argv, namespace=_Arguments())  # pragma: no mutate
     _ = sys.stdout.write(greeting(arguments.name) + "\n")
     return 0

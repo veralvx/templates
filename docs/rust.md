@@ -88,6 +88,8 @@ first. After it:
   (`cargo`, and so the git hooks' format check), and `just miri`'s nightly.
   The crates need nothing: there are none to fetch until you add one.
 - `just audit` (and `just checks`): cargo-audit fetches its advisory database.
+- `just links` (not `just links --offline`, which `just checks` runs): lychee
+  fetches each link -- a day's passes cached (`.lycheecache`).
 - dprint, on its first run (`just dprint-check`, the hooks): its plugins,
   `dprint.json`'s URLs; then from its cache.
 - `nix develop`, `nix build` and the flake's checks: the lock's inputs and its
@@ -110,6 +112,10 @@ git and the commit-message check (`cog`) need none.
 | `keywords`        | `rust`              | `package.keywords` (comma-separated, max 5)                       |
 | `categories`      | `development-tools` | `package.categories` (comma-separated, max 5)                     |
 | `container_image` | `true` (not `lib`)  | the flake's `image` and `image.yml` -- see below                  |
+| `citation`        | `false`             | `CITATION.cff`, only if true -- see below                         |
+| `family_names`    | — (with `citation`) | `CITATION.cff`'s author                                           |
+| `given_names`     | *(empty)*           | `CITATION.cff`'s author -- omitted if blank                       |
+| `orcid`           | *(empty)*           | `CITATION.cff`'s author, as its URL -- omitted if blank           |
 
 Every answer is validated at the prompt, so a typo is caught before generation
 rather than at `cargo publish`. The project name is checked before anything is
@@ -122,7 +128,19 @@ characters per keyword), and neither may be empty:
 `clippy::cargo_common_metadata` is enabled and requires both.
 
 `container_image` is asked for the layouts with a binary alone: a library has
-nothing to run.
+nothing to run; `family_names`, `given_names` and `orcid` with `citation`
+alone.
+
+With `citation`, the project gets a `CITATION.cff` (Citation File Format 1.2.0):
+GitHub shows it as "Cite this repository", and Zenodo, enabled for the
+repository, archives each GitHub release with it as its metadata and mints a
+DOI. Its author is asked by parts, as Zenodo's import takes them: the family
+names (required: it refuses an author without), the given names and an ORCID iD
+(`0000-0002-1825-0097`; its check digit is Zenodo's to verify), none with a
+comma, which it reads as the family names' end; its title is the project's name,
+which Zenodo refuses under three characters. It carries no version or date: no
+release moves them. The flake's `citation` check validates it against CFF's
+schema.
 
 ### What `project_kind` selects
 
@@ -204,30 +222,39 @@ rust-toolchain.toml   pinned to the MSRV
 rustfmt.toml          edition 2024, 100 columns
 dprint.json           Markdown + TOML formatting, its plugins pinned
                       (`just dprint-update`)
-cliff.toml            git-cliff changelog generation, grouped by commit type
+cliff.toml            git-cliff changelog generation, grouped by commit type,
+                      each entry linking its commit
 cog.toml              cocogitto / Conventional Commits
 dist-workspace.toml   cargo-dist config (binaries only)
 justfile              `just checks` = the checks CI runs, the flake's last;
                       `just fmt`, `just release`
 .githooks/            opt-in (`just install-hooks`): formatting, the shell,
-                      the workflows and dprint before a commit, Conventional
-                      Commits for the message and the push
+                      the workflows (actionlint, zizmor) and dprint before a
+                      commit, Conventional Commits for the message and the
+                      push
 flake.nix             Nix: the pinned toolchain and every tool, `nix fmt`, the
                       package, CI's checks as derivations, the OCI image (if
                       chosen)
 flake.lock            nixpkgs and rust-overlay, those the template's smoke test
                       runs on
 .editorconfig         shfmt's style, for the shell scripts and the git hooks
+.gitattributes        every text file LF, a Windows checkout's too
 .cargo/config.toml    Miri flags
-.gitignore            target/, Nix's result links, direnv
-src/, tests/          starter code that passes the lint set as-is
+.cargo/mutants.toml   the mutants `just mutants` skips, each with its reason
+lychee.toml           the link check's settings (`just links`): the
+                      repository's own pages left out
+CITATION.cff          the citation, with `citation`
+.gitignore            target/, cargo-mutants' reports, lychee's cache,
+                      Nix's result links, direnv
+src/, tests/          starter code that passes the lint set as-is, every
+                      mutant caught (`just mutants`: cargo-mutants)
                       (a workspace puts these under crates/<name>/ and
                       crates/<name>-core/ instead)
 AGENTS.md             the lint policy, and what to do when a lint fires
 README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT
 LICENSE-MIT / LICENSE-APACHE (a workspace member carries its own copies)
-.github/              8 workflows (9 with the image, and its registries
-                      script; a library's 9, publish.yml its own, with
+.github/              9 workflows (10 with the image, and its registries
+                      script; a library's 10, publish.yml its own, with
                       the release-notes script),
                       dependabot, issue + PR templates, and actionlint's
                       config: dist's release.yml's shellcheck notes are
@@ -259,13 +286,17 @@ with `#[expect(lint, reason = "...")]`.
 
 ### The CI workflows
 
-- `rust-ci.yml` -- check, test (including doctests), Miri, clippy with `-D
-  warnings`, MSRV, `cargo fmt --check`, and a rustdoc build with warnings
-  denied. rustup obeys `rust-toolchain.toml` over a toolchain action's default,
-  so the stable jobs set `RUSTUP_TOOLCHAIN=stable`, which outranks the file;
-  the MSRV job reads `rust-version` out of `Cargo.toml` at run time and fails
-  if `rust-toolchain.toml` names another version.
+- `rust-ci.yml` -- check, test (including doctests), Miri, clippy with
+  `-D warnings`, MSRV, `cargo fmt --check`, and a rustdoc build with warnings
+  denied; and cargo-mutants in the dev shell (`just mutants`), a mutant the
+  tests do not catch failing it. rustup obeys `rust-toolchain.toml` over a
+  toolchain action's default, so the stable jobs set `RUSTUP_TOOLCHAIN=stable`,
+  which outranks the file; the MSRV job reads `rust-version` out of `Cargo.toml`
+  at run time and fails if `rust-toolchain.toml` names another version.
 - `rust-audit.yml` -- `cargo audit` on every manifest change and nightly.
+- `links.yml` -- every link of the files git tracks, online (`just links`,
+  lychee), monthly and on demand: a page moves or goes with nothing changed
+  here.
 - `dependency-review.yml` -- licence and advisory review on pull requests.
 - `dependabot-automerge.yml` -- auto-merges patch/minor bumps. Read the setup
   comment at the top: without required status checks it merges things CI never
@@ -273,13 +304,14 @@ with `#[expect(lint, reason = "...")]`.
 - `style-check-dprint.yml`, `style-check-cocogitto.yml` -- formatting and
   Conventional Commits: every commit (no tag needed), and a pull request's
   title, which a squash merge makes the commit.
-- `nix.yml` -- `nix fmt -- --ci` (nixfmt, shfmt and just's own, through
-  treefmt: it formats, and fails if that changed a file), then
-  `nix flake check`: the flake's clippy, rustfmt, rustdoc and test derivations
-  built (the image too, with it), the format, the shell (`just shell-check`:
-  shellcheck and shfmt over the scripts, the hooks and the justfile's script
-  recipes) and the workflows (actionlint), on x86_64 and aarch64 Linux, and
-  every system it declares evaluated.
+- `nix.yml` -- `nix fmt -- --ci` (nixfmt, shfmt and just's own, through treefmt:
+  it formats, and fails if that changed a file), then `nix flake check`: the
+  flake's clippy, rustfmt, rustdoc and test derivations built (the image too,
+  with it), the format, the shell (`just shell-check`: shellcheck and shfmt over
+  the scripts, the hooks and the justfile's script recipes), the workflows
+  (actionlint, and zizmor offline, dist's `release.yml` aside), the local links
+  (lychee) and the citation (if any), on x86_64 and aarch64 Linux, and every
+  system it declares evaluated.
 - `publish-crates.yml` -- the release's crates to crates.io (`cargo publish
   --workspace` at the tag, each version crates.io holds already passed over),
   through Trusted Publishing: no token stored with the repository. dist's
@@ -300,17 +332,17 @@ with `#[expect(lint, reason = "...")]`.
   it; by hand on a branch, a rehearsal that pushes nothing.
 
 Every action is pinned to a commit, its version in a comment; Dependabot moves
-them. Its Cargo bumps are `build(deps)` commits, which enter the changelog, and
-its action bumps `ci(deps)`, which do not; the flake's inputs move monthly, in
-one pull request -- `build(deps)` where `nix build` ships the binary, a
-library's `chore(deps)`, merged by a person (a commit's move is no patch or
-minor bump). The toolchain is the MSRV's: a `1.<minor>` one moves to
+them. Its Cargo bumps are `build(deps)` commits, the changelog's Build, and its
+action bumps `ci(deps)`, its Miscellaneous Tasks; the flake's inputs move
+monthly, in one pull request -- `build(deps)` where `nix build` ships the
+binary, a library's `chore(deps)`, merged by a person (a commit's move is no
+patch or minor bump). The toolchain is the MSRV's: a `1.<minor>` one moves to
 rust-overlay's newest patch of it (`1.<minor>.<patch>` stays), the miri shell's
-nightly to its newest. dist follows, where it is used: the flake's `pins`
-check fails once the dev shell's moved, and `just pins-update` on the branch
-moves `cargo-dist-version` and `release.yml` to it (`dist init`, then `just
-fmt`). In this repository, Dependabot moves every template's workflows with
-the repository's own, in one pull request
+nightly to its newest. dist follows, where it is used: the flake's `pins` check
+fails once the dev shell's moved, and `just pins-update` on the branch moves
+`cargo-dist-version` and `release.yml` to it (`dist init`, then `just fmt`). In
+this repository, Dependabot moves every template's workflows with the
+repository's own, in one pull request
 ([.github/dependabot.yml](../.github/dependabot.yml)).
 
 ### The changelog and `just release`

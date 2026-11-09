@@ -12,13 +12,17 @@ nixpkgs' Python {{python_min}} (its own downloads off) -- or, installed yourself
 
 - **[uv](https://docs.astral.sh/uv/)**: `pyproject.toml`'s `required-version`,
   which writes and checks the lock. `uv sync --locked` then installs the dev group -- ruff,
-  basedpyright, ty, vulture, pytest and its plugins -- at the pinned versions.
+  basedpyright, ty, vulture, pytest and its plugins, mutmut -- at the pinned versions.
 - **[just](https://github.com/casey/just)** -- the command runner the automation is written in.
 - **[ShellCheck](https://www.shellcheck.net/)**, **[shfmt](https://github.com/mvdan/sh)** and
   **[jq](https://jqlang.org/)** -- the shell's linter and formatter (its style is
   `.editorconfig`'s), and what `just shell-check` reads the justfile's recipes with.
 - **[actionlint](https://github.com/rhysd/actionlint)** -- lints the workflows (and, through
   ShellCheck, their `run:` scripts).
+- **[zizmor](https://docs.zizmor.sh/)** -- audits the workflows' security, and Dependabot's
+  configuration, offline.
+- **[lychee](https://lychee.cli.rs/)** -- checks the links of the files git tracks (`just links`;
+  `links.yml` monthly, online).
 - **[dprint](https://dprint.dev/)** -- formats the Markdown and TOML.
 - **[cocogitto](https://docs.cog.tools/)** (`cog`) -- enforces Conventional Commits.
 - **[Nix](https://nixos.org)** for the last of `just checks`, the flake's checks (`just nix`):
@@ -41,10 +45,10 @@ uv sync --locked
 ```
 
 3. Optionally, `just install-hooks`: `.githooks/` then checks the lock, ruff, the shell, the
-   workflows and dprint before each commit, the message as a Conventional Commit, and every pushed
-   commit's message before a push -- what CI would refuse, minutes earlier. They need `just`,
-   `uv`, `shellcheck`, `shfmt`, `jq`, `actionlint`, `dprint` and `cog` on `PATH` (inside
-   `nix develop`, with Nix); `git config --unset core.hooksPath` turns them off.
+   workflows (actionlint, zizmor) and dprint before each commit, the message as a Conventional
+   Commit, and every pushed commit's message before a push -- what CI would refuse, minutes earlier.
+   They need `just`, `uv`, `shellcheck`, `shfmt`, `jq`, `actionlint`, `zizmor`, `dprint` and `cog`
+   on `PATH` (inside `nix develop`, with Nix); `git config --unset core.hooksPath` turns them off.
 
 ## Guidelines
 
@@ -64,6 +68,10 @@ contributions alike.
 - **Where logic goes:** in `packages/{{project-name}}-core`, not in the command line, which
   parses arguments and prints.
 {%- endif %}
+- **Mutations:** `just mutation` changes the code a mutant at a time (mutmut) and fails on each
+  one no test kills -- a test missing, or a change that keeps the behaviour: its line marked
+  `# pragma: no mutate`, with the reason in a comment. `uv run mutmut show <name>` shows one{% if project_kind == "workspace" %},
+  from its member's folder{% endif %}.
 - **The tests import the package as installed** (pytest's `--import-mode=importlib`): the editable
   install here, the built one in the flake's checks -- so a file missing from the wheel fails
   there.
@@ -91,7 +99,11 @@ contributions alike.
 2. Run the checks. The `justfile` runs the workflows' commands:
 
 ```sh
-just checks   # the lock, ruff, the shell, the workflows, types, dead code, tests, dprint, cog, pip-audit, nix
+just checks   # the lock, ruff, the shell, the workflows, the local links, types, dead code, tests,
+              # mutations, dprint, cog, pip-audit, nix
+just mutation # mutmut: every mutant of the code killed by the tests
+just zizmor   # the workflows' security audit (zizmor), offline
+just links    # every link checked online (lychee); --offline: the local ones, as `just checks`
 just nix      # `nix fmt -- --ci`, then the flake's checks, as nix.yml: git's files only
 just format   # ruff (imports, format), shfmt, the justfile and dprint in place, then `nix fmt`
 just build    # every package's sdist and wheel, into dist/
@@ -158,6 +170,17 @@ Then, in whichever order suits you:
   -- and the variable `DOCKERHUB_REPOSITORY` (`namespace/name`) unless it is
   `<username>/<this repository's name>`. A Docker Hub failure holds the GHCR release back too.
 {%- endif %}
+{%- if citation %}
+- To archive each release with a DOI, enable the repository on [Zenodo](https://zenodo.org) (its
+  profile menu → GitHub, the repository's toggle): each GitHub release is then archived, its
+  metadata `CITATION.cff`'s. Once the first is, add its concept DOI, which names every version, to
+  `CITATION.cff` (`doi:`): GitHub's "Cite this repository" gives it from then on.
+{%- if license == "MIT OR Apache-2.0" %}
+  Zenodo's import refuses `CITATION.cff`'s list of licences, the Citation File Format's OR, so it
+  archives no release until
+  [zenodo/zenodo-rdm#1509](https://github.com/zenodo/zenodo-rdm/issues/1509) is fixed.
+{%- endif %}
+{%- endif %}
 - Run `just checks` once to confirm your tools are complete: a step that stops on a missing
   command names it ([Prerequisites](#prerequisites) lists them; `nix develop` has them all).
 - `just install-hooks`, if you want git to run the quick checks before each commit and push
@@ -209,8 +232,8 @@ GitHub pre-release)
 {% if project_kind == "workspace" %}the main package's, {% endif %}`image.yml` too (its OCI image to GHCR, from the flake's `image`: `nix build
 .#image` builds it here){% endif %}.
 
-- The commits since the last tag must hold a change a user meets (`feat`, `fix`, `perf`,
-  `build`...): `chore`, `ci` and `style` alone make no release.
+- The commits since the last tag must hold one the changelog lists: any but a merge, a fixup and the
+  release commit itself.
 - The release pushes to `main` directly: with "Require a pull request before merging" on, the
   maintainer cutting it needs the rule's bypass. A refused push leaves the commit and the tag
   local -- push them again with `git push --atomic origin main <tag>` once allowed.

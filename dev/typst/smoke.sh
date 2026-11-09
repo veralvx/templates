@@ -5,7 +5,8 @@
 # (the root's: one lock), then `just format`, which must leave the project as generated. It needs
 # Nix. Its releases and `just floor` are CI's.
 set -euo pipefail
-nix develop --command just format-check lint shell-check actionlint test versions-check \
+nix develop --command just format-check lint shell-check actionlint zizmor test versions-check \
   readme-check template-check package-check dprint-check cog
+nix develop --command just links --offline
 nix develop --command just format
 git diff --exit-code

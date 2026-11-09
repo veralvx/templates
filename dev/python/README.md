@@ -37,11 +37,11 @@ in its own flake's dev shell.
 ## render-check
 
 `just render-check python` installs `dev/requirements.txt` into `.venv` (Python 3.11+, for tomllib)
-and runs `dev/python/render-check.py`, which renders every templated file for all 108 combinations
+and runs `dev/python/render-check.py`, which renders every templated file for all 432 combinations
 of `project_kind` (with the image or without; a lib with it unasked, or given anyway) × `license` ×
-`python_min` × empty-or-present email and keywords, then checks that nothing is left unexpanded and
-that the result parses as TOML, YAML, JSON and -- with `nix-instantiate` on `PATH` -- Nix. It also
-guards what fails silently otherwise:
+`python_min` × empty-or-present email and keywords × the citation (none, every value, the family
+names alone), then checks that nothing is left unexpanded and that the result parses as TOML, YAML,
+JSON and -- with `nix-instantiate` on `PATH` -- Nix. It also guards what fails silently otherwise:
 
 - **Every referenced variable is declared.** cargo-generate renders an unknown variable as an
   empty string, and a file it cannot render at all as it stands, without a word (0.25,
@@ -63,9 +63,10 @@ guards what fails silently otherwise:
 The checks every template shares are [dev/render_core.py](../render_core.py)'s -- each prompt's name
 (none cargo-generate reserves) and default (against its choices and its regex), the generation
 answers (`answers.toml`) against the prompts, the `ignore` paths and the hooks, the variables and
-the encoding, the exclude list, every case rendered and parsed -- and `dev/python/render-check.py`
-adds python's own on top. Each check runs on its own: one that fails, or cannot run because a file
-before it did not render, is reported, the rest still run, and the exit status is 1.
+the encoding, the exclude list, every case rendered and parsed, and CITATION.cff only where a
+citation is asked, holding its answers -- and `dev/python/render-check.py` adds python's own on top.
+Each check runs on its own: one that fails, or cannot run because a file before it did not render,
+is reported, the rest still run, and the exit status is 1.
 
 ## The shared files
 
@@ -91,8 +92,8 @@ Liquid, copies it back, then moves the pins of `pyproject.toml`'s dependency gro
   `just format` changing nothing, the image run (bin's and workspace's), the changelog and the
   build; and for `bin` and `workspace` (`lib` releases as `bin` does), real releases against a bare
   remote, each tag then read as `publish.yml` reads it.
-- `nix.yml`: the root flake (`just nix`): its format, the shell (every template's) and the
-  workflows (every template's).
+- `nix.yml`: the root flake (`just nix`): its format, the shell (every template's), the workflows
+  (every template's: actionlint and zizmor) and the local links.
 - `style-check-dprint.yml`, `style-check-cocogitto.yml`: dprint and the commits.
 - `dependabot-automerge.yml`: Dependabot's patch and minor bumps (the actions, render-check's
   packages) merged once the required checks pass.
@@ -163,6 +164,17 @@ this repository's history. Also run here:
   or with no cached one, vulture built without its tests (15). On an uncached floor the package's
   build tools still build so (23), and with none cached (a 3.15 floor) its tests and types on it too
   (59 in all). Not run: a 3.15 check built.
+
+- **zizmor, lychee, mutmut and the citation**, added here: zizmor 1.31.1's findings on the
+  workflows and Dependabot's configuration (a checkout's kept credential, a 3-day cooldown, a
+  matrix value spliced into a `run:` script) fixed, and `just zizmor` finds none in each kind;
+  `just links --offline` passes in each, the lock left out (its archives' URLs); `just mutation`
+  (mutmut 3.8.0) kills every mutant of each kind's starter code -- a workspace's from each member's
+  folder, as mutmut names a mutant by its path from the run's -- after a `--help` test for the
+  strings it changed and `# pragma: no mutate` on the namespace argparse's default stands in for,
+  and fails on the survivors it lists; render-check refuses a CITATION.cff field misnamed, and the
+  flake's `citation` check (cffconvert) passes on the answers' citation. `just smoke python` passes
+  for every kind, with Nix (the flake's checks built), its citation answered.
 
 ### In python-template, before the move
 

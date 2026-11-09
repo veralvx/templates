@@ -31,6 +31,10 @@ minutes -- or, installed yourself:
     (`.github/install-tools.sh`).
 - **[jq](https://jqlang.org/)** -- what the recipes read `typst eval`'s and `just --dump`'s JSON
   with.
+- **[zizmor](https://docs.zizmor.sh/)** -- audits the workflows' security, and Dependabot's
+  configuration, offline.
+- **[lychee](https://lychee.cli.rs/)** -- checks the links of the files git tracks (`just links`;
+  `links.yml` monthly, online).
 - **[dprint](https://dprint.dev/)** -- formats the Markdown and TOML.
 - **[cocogitto](https://docs.cog.tools/)** (`cog`) -- enforces Conventional Commits.
 - **[git-cliff](https://git-cliff.org/)**, for maintainers: `just changelog` and `just release`
@@ -48,10 +52,10 @@ git clone https://github.com/<you>/{{project-name}} && cd {{project-name}}
 ```
 
 3. Optionally, `just install-hooks`: `.githooks/` then checks the Typst code's format, the shell,
-   the workflows, the imports' versions and dprint before each commit, the message as a
-   Conventional Commit, and every pushed commit's message before a push -- what CI would refuse,
-   minutes earlier. They need `just`, `typst`, `jq`, `typstyle`, `shellcheck`, `shfmt`,
-   `actionlint`, `dprint` and `cog` on `PATH` (inside `nix develop`, with Nix);
+   the workflows (actionlint, zizmor), the imports' versions and dprint before each commit, the
+   message as a Conventional Commit, and every pushed commit's message before a push -- what CI
+   would refuse, minutes earlier. They need `just`, `typst`, `jq`, `typstyle`, `shellcheck`,
+   `shfmt`, `actionlint`, `zizmor`, `dprint` and `cog` on `PATH` (inside `nix develop`, with Nix);
    `git config --unset core.hooksPath` turns them off.
 
 ## Guidelines
@@ -94,6 +98,8 @@ just bundle          # dist/preview/<name>/<version>: what typst/packages would 
 just install         # the bundle as @local/<name>:<version>, to try it in a document{% if project_kind == "template" %}
 just install preview # ... as @preview, for `typst init` of it (shadows the published version){% endif %}
 just floor           # the README{% if project_kind == "template" %} and the template{% endif %} on `compiler`'s Typst, as typst-<version>
+just zizmor          # the workflows' security audit (zizmor), offline
+just links           # every link checked online (lychee); --offline: the local ones, as `just checks`
 ```
 
 `just` alone lists every recipe.
@@ -136,6 +142,17 @@ With [Nix](https://nixos.org), `nix develop` enters a shell with every tool `jus
 - To have a release prepare its Typst Universe submission ([below](#publishing-on-typst-universe)):
   fork [typst/packages](https://github.com/typst/packages), then set the repository variable
   `UNIVERSE_FORK` and the secret `UNIVERSE_TOKEN`.
+{%- if citation %}
+- To archive each release with a DOI, enable the repository on [Zenodo](https://zenodo.org) (its
+  profile menu → GitHub, the repository's toggle): each GitHub release is then archived, its
+  metadata `CITATION.cff`'s. Once the first is, add its concept DOI, which names every version, to
+  `CITATION.cff` (`doi:`): GitHub's "Cite this repository" gives it from then on.
+{%- if license == "MIT OR Apache-2.0" %}
+  Zenodo's import refuses `CITATION.cff`'s list of licences, the Citation File Format's OR, so it
+  archives no release until
+  [zenodo/zenodo-rdm#1509](https://github.com/zenodo/zenodo-rdm/issues/1509) is fixed.
+{%- endif %}
+{%- endif %}
 - Run `just checks` once to confirm your tools are complete: a step that stops on a missing
   command names it.
 - Make the package yours: the code under `src/`, the tests, the README (it is the package's page
@@ -157,8 +174,8 @@ release's: it refuses a release with nothing in it, sets the version in `typst.t
 `v<version>` and pushes the commit and the tag together. The first release is the version
 `typst.toml` declares, `0.1.0`, whatever the level.
 
-- The commits since the last tag must hold a change a user meets (`feat`, `fix`, `perf`,
-  `build`...): `chore`, `ci` and `style` alone make no release.
+- The commits since the last tag must hold one the changelog lists: any but a merge, a fixup and the
+  release commit itself.
 - The release pushes to `main` directly: with "Require a pull request before merging" on, the
   maintainer cutting it needs the rule's bypass. A refused push leaves the commit and the tag
   local -- push them again with `git push --atomic origin main v<version>` once allowed.

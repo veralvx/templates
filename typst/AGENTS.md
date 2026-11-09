@@ -22,15 +22,15 @@ effect, a value a function's return discards, a font name it does not know). Nei
 tinymist can silence one at the site, so fix the cause: a deprecated name replaced, a font that
 exists, a missing language tag on a code block.
 
-Code is formatted by typstyle, the shell scripts by shfmt (`.editorconfig` holds its style) --
-both at the versions `flake.lock` locks -- the justfile by just, the Markdown and TOML by dprint,
-and the Nix by nixfmt: `just format` runs them all, `nix fmt` all but dprint. A script is named
-`*.sh`, a git hook excepted: `.editorconfig` and `nix fmt` reach no other. The workflows pass
-actionlint.
-Shell passes ShellCheck, a justfile script recipe included (`just shell-check` reads them out of
-`just --dump`, and refuses one that splices a value into its text: it takes arguments). Names
-users call are kebab-case (`page-margin`, not `pageMargin`), as Typst's own are and package-check
-asks.
+Code is formatted by typstyle, the shell scripts by shfmt (`.editorconfig` holds its style) -- both
+at the versions `flake.lock` locks -- the justfile by just, the Markdown and TOML by dprint, and the
+Nix by nixfmt: `just format` runs them all, `nix fmt` all but dprint. A script is named `*.sh`, a
+git hook excepted: `.editorconfig` and `nix fmt` reach no other. The workflows pass actionlint and
+zizmor's audit, offline: a finding is fixed, or ignored on its line with the reason
+(`# zizmor: ignore[<audit>]`). Shell passes ShellCheck, a justfile script recipe included
+(`just shell-check` reads them out of `just --dump`, and refuses one that splices a value into its
+text: it takes arguments). Names users call are kebab-case (`page-margin`, not `pageMargin`), as
+Typst's own are and package-check asks.
 
 ## 3. What a package can and cannot hold
 
@@ -75,10 +75,11 @@ that is noise, and it goes stale. A change that falsifies a comment rewrites it.
 
 ## 6. Commits
 
-[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally
-and in CI. The changelog is generated from the commits (`cliff.toml`), so the subject line is
-user-facing text; `chore`, `ci` and `style` commits stay out of it, and `!` or a
-`BREAKING CHANGE` footer lists a commit first:
+[Conventional Commits](https://www.conventionalcommits.org/) are enforced by `cog check` locally and
+in CI. The changelog is generated from the commits (`cliff.toml`), so the subject line is
+user-facing text; every commit enters it, by type -- `chore` and `ci` under Miscellaneous Tasks,
+`style` under Styling; merges, fixups and the release commit aside -- and `!` or a `BREAKING CHANGE`
+footer lists a commit first:
 
 ```text
 {% if project_kind == "template" -%}

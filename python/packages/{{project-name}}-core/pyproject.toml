@@ -59,3 +59,10 @@ Repository = "https://github.com/{{github_username}}/{{project-name}}"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/{{crate_name}}_core"]
+
+# `just mutation`, from this folder: mutmut names a mutant by its file's path from where it runs,
+# its code in src/ alone -- the workspace's root holds two. The tests named: pytest's settings are
+# the root's, whose testpaths are the other members' too.
+[tool.mutmut]
+source_paths = ["src"]
+pytest_add_cli_args_test_selection = ["tests"]
