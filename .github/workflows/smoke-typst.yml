@@ -48,7 +48,7 @@ jobs:
         run: dev/install-cargo-generate.sh
 
       - name: Install Nix
-        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+        uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
 
       # the template's lock's, as a generated project's dev shell has it
       - name: Install dprint
@@ -145,7 +145,7 @@ jobs:
         run: dev/install-cargo-generate.sh
 
       - name: Install Nix
-        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+        uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
 
       # what a contributor runs beside the project's CI tools, at the template's lock's versions:
       # the hooks' dprint and cog, `just release`'s git-cliff
@@ -173,7 +173,7 @@ jobs:
       # as the generated checks.yml installs them: the oldest Typst first, so the flake's tools,
       # added to PATH after it, hold the `typst` named so
       - name: Install the oldest Typst
-        uses: typst-community/setup-typst@6a2cfaf0b28d636b00148f965e315bae81079aaa # v5.3.1
+        uses: typst-community/setup-typst@00ad6338f0b34724ea002136bfb701a6c18585b0 # v5.3.2
         with:
           typst-version: ${{ steps.generate.outputs.compiler }}
           executable-name: typst-${{ steps.generate.outputs.compiler }}
@@ -310,7 +310,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+        uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
 
       # the newest cargo-generate the template meets: its lock's (the floor generates the other
       # jobs' projects)
